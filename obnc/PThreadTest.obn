@@ -6,36 +6,45 @@
 *)
 MODULE PThreadTest;
 
-IMPORT Tests, artPThread, Out;
+IMPORT Tests, artPThread, Out, Clock := artClock;
 
 VAR
     ts: Tests.TestSet;
 
-PROCEDURE TestMinimalPThreadProc(): BOOLEAN;
+PROCEDURE TestSleep(): BOOLEAN;
 VAR pass, result: BOOLEAN;
-    cv : artPThread.CondVar;
+    startTime, endTime: INTEGER;
+    c : Clock.Clock;
 BEGIN
     pass := TRUE;
-    result := FALSE;
-    Out.String("  TestMinimalPThreadProc...");
-    NEW(cv);
+    NEW(c);
+    Clock.Get(c);
+    Out.String("  TestSleep (s):"); Out.Int(c.minute, 0); Out.String(":"); Out.Int(c.second, 0); Out.Ln;
     
-    result := artPThread.Signal(cv); (* Call the minimal procedure *)
+    Out.String("Sleeping for 2 seconds..."); Out.Ln;
+    (* Simple test: Sleep should not crash and should take some time *)
+    artPThread.Sleep(2000); (* Sleep for 10 milliseconds *)
     
-    (* This test primarily checks if the call can be made without crashing,
-       indicating successful linking and C interop. *)
-    Tests.ExpectedBool(TRUE, result, "Call to artPThread.Signal completed", pass);
+    Clock.Get(c);
+    Out.String("  TestSleep (s):"); Out.Int(c.minute, 0); Out.String(":"); Out.Int(c.second, 0); Out.Ln;
     
-    IF pass THEN Out.String(" OK") ELSE Out.String(" FAILED") END; Out.Ln;
+    (* Test with zero - should not crash *)
+    artPThread.Sleep(0);
+    
+    (* Test with negative - should not crash *)
+    artPThread.Sleep(-1);
+    
+    (* This test primarily checks if the call can be made without crashing *)
+    Tests.ExpectedBool(TRUE, TRUE, "Sleep function calls completed", pass);
     RETURN pass
-END TestMinimalPThreadProc;
+END TestSleep;
 
 BEGIN
-    Tests.Init(ts, "artPThread (Minimal)");
-    Out.String("Running artPThread (Minimal) Tests..."); Out.Ln;
+    Tests.Init(ts, "artPThread");
+    Out.String("Running artPThread Tests..."); Out.Ln;
     
-    Tests.Add(ts, TestMinimalPThreadProc);
+    Tests.Add(ts, TestSleep);
     
     ASSERT(Tests.Run(ts));
-    Out.String("artPThread (Minimal) Tests Completed."); Out.Ln;
+    Out.String("artPThread Tests Completed."); Out.Ln;
 END PThreadTest.

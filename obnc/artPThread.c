@@ -1,5 +1,10 @@
 #include ".obnc/artPThread.h"
 #include <obnc/OBNC.h>
+#include <pthread.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <errno.h>
+
 
 #define OBERON_SOURCE_FILENAME "artPThread.obn"
 
@@ -87,6 +92,9 @@ int artPThread__Join_(artPThread__Thread_ thread_)
 
 void artPThread__Sleep_(OBNC_INTEGER ms_)
 {
+	if (ms_ > 0) {
+		usleep(ms_ * 1000);  /* Convert milliseconds to microseconds */
+	}
 }
 
 
