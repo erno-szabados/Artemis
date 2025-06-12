@@ -260,19 +260,35 @@ int artPThread__Broadcast_(artPThread__CondVar_ cv_)
 
 struct artPThread__ThreadStartArg {
 	artPThread__ThreadProc_ proc_;
+	OBNC_INTEGER context_;
 };
 
+/**
+ * POSIX threads require a function with the signature (void *(*)(void *)) as the entry point.
+ * Oberon-07 thread procedures have the signature artPThread__ThreadProc_.
+ */
+/**
+ * Thread trampoline function that calls the user-defined procedure.
+ * This function receives the pointer to the start argument structure,
+ * extracts the procedure pointer, and calls it with a dummy argument.
+ * After the procedure call, it frees the start argument structure.
+ */
 static void *artPThread__ThreadTrampoline(void *arg)
 {
 	struct artPThread__ThreadStartArg *startArg = (struct artPThread__ThreadStartArg *)arg;
 	if (startArg && startArg->proc_) {
-		startArg->proc_(0); // Call with dummy argument
+		startArg->proc_(startArg->context_);
 	}
 	free(startArg);
 	return NULL;
 }
 
-artPThread__Thread_ artPThread__NewThread_(artPThread__ThreadProc_ proc_)
+/**
+ * Creates a new thread and starts it with the given procedure.
+ * The procedure should match the artPThread__ThreadProc_ signature.
+ * Returns a pointer to the thread descriptor or NULL on failure.
+ */
+artPThread__Thread_ artPThread__NewThread_(artPThread__ThreadProc_ proc_, OBNC_INTEGER context_)
 {
 	artPThread__Thread_ thread;
 	pthread_t *pth;
@@ -295,6 +311,7 @@ artPThread__Thread_ artPThread__NewThread_(artPThread__ThreadProc_ proc_)
 		return NULL;
 	}
 	startArg->proc_ = proc_;
+	startArg->context_ = context_;
 
 	if (pthread_create(pth, NULL, artPThread__ThreadTrampoline, startArg) != 0) {
 		free(pth);

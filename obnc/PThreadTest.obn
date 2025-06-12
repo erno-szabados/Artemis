@@ -156,11 +156,13 @@ END ThreadProc;
 PROCEDURE TestThread(): BOOLEAN;
 VAR pass, ok: BOOLEAN;
     t: artPThread.Thread;
+    context : INTEGER;
 BEGIN
+    context := 0;
     pass := TRUE;
     Out.String("  TestThread...");
     threadRan := FALSE;
-    t := artPThread.NewThread(ThreadProc);
+    t := artPThread.NewThread(ThreadProc, context);
     Tests.ExpectedBool(FALSE, t = NIL, "Thread creation should succeed", pass);
     IF t # NIL THEN
         ok := artPThread.Join(t);
@@ -178,7 +180,7 @@ BEGIN
     Tests.Add(ts, TestSleep);
     Tests.Add(ts, TestMutex);
     Tests.Add(ts, TestCondVar);
-    (* This test hangs without threads implemented - disabled for now. *)
+    (* This test hangs without threads - disabled for now. *)
     (* Tests.Add(ts, TestCondVarWaitSignal); *)
     Tests.Add(ts, TestThread);
     

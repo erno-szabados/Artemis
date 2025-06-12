@@ -100,7 +100,7 @@ BEGIN
 END Broadcast;
 
 (** Create a new thread *)
-PROCEDURE NewThread*(proc: ThreadProc): Thread;
+PROCEDURE NewThread*(proc: ThreadProc; context : INTEGER): Thread;
 BEGIN
     (* Formal body, C implementation takes precedence. *)
     RETURN NIL
