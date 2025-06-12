@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <errno.h>
+#include <stdint.h>
 
 
 #define OBERON_SOURCE_FILENAME "artPThread.obn"
@@ -22,24 +23,98 @@ const OBNC_Td artPThread__ThreadDesc_td = {artPThread__ThreadDesc_ids, 1};
 
 artPThread__Mutex_ artPThread__NewMutex_(void)
 {
-	return 0;
+	artPThread__Mutex_ mutex;
+	pthread_mutex_t *pmutex;
+	
+	/* Allocate memory for the mutex record */
+	mutex = OBNC_Allocate(sizeof(struct artPThread__MutexDesc_), OBNC_REGULAR_ALLOC);
+	
+	/* Allocate memory for pthread_mutex_t */
+	pmutex = malloc(sizeof(pthread_mutex_t));
+	if (pmutex == NULL) {
+		return NULL; /* Memory allocation failed */
+	}
+	
+	/* Initialize the mutex */
+	if (pthread_mutex_init(pmutex, NULL) != 0) {
+		free(pmutex);
+		return NULL; /* Mutex initialization failed */
+	}
+	
+	/* Store the pthread_mutex_t pointer as handle */
+	mutex->handle_ = (OBNC_INTEGER)(uintptr_t)pmutex;
+	
+	return mutex;
 }
 
 
 void artPThread__FreeMutex_(artPThread__Mutex_ *mutex_)
 {
+	pthread_mutex_t *pmutex;
+	
+	if (mutex_ != NULL && *mutex_ != NULL) {
+		/* Get the pthread_mutex_t pointer from handle */
+		pmutex = (pthread_mutex_t *)(uintptr_t)(*mutex_)->handle_;
+		
+		if (pmutex != NULL) {
+			/* Destroy the mutex */
+			pthread_mutex_destroy(pmutex);
+			
+			/* Free the allocated memory */
+			free(pmutex);
+		}
+		
+		/* Set the pointer to NULL */
+		*mutex_ = NULL;
+	}
 }
 
 
 int artPThread__Lock_(artPThread__Mutex_ mutex_)
 {
-	return 0;
+	pthread_mutex_t *pmutex;
+	
+	if (mutex_ == NULL) {
+		return 0; /* FALSE - invalid mutex */
+	}
+	
+	/* Get the pthread_mutex_t pointer from handle */
+	pmutex = (pthread_mutex_t *)(uintptr_t)mutex_->handle_;
+	
+	if (pmutex == NULL) {
+		return 0; /* FALSE - invalid handle */
+	}
+	
+	/* Lock the mutex */
+	if (pthread_mutex_lock(pmutex) == 0) {
+		return 1; /* TRUE - success */
+	} else {
+		return 0; /* FALSE - lock failed */
+	}
 }
 
 
 int artPThread__Unlock_(artPThread__Mutex_ mutex_)
 {
-	return 0;
+	pthread_mutex_t *pmutex;
+	
+	if (mutex_ == NULL) {
+		return 0; /* FALSE - invalid mutex */
+	}
+	
+	/* Get the pthread_mutex_t pointer from handle */
+	pmutex = (pthread_mutex_t *)(uintptr_t)mutex_->handle_;
+	
+	if (pmutex == NULL) {
+		return 0; /* FALSE - invalid handle */
+	}
+	
+	/* Unlock the mutex */
+	if (pthread_mutex_unlock(pmutex) == 0) {
+		return 1; /* TRUE - success */
+	} else {
+		return 0; /* FALSE - unlock failed */
+	}
 }
 
 

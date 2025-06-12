@@ -12,8 +12,7 @@ VAR
     ts: Tests.TestSet;
 
 PROCEDURE TestSleep(): BOOLEAN;
-VAR pass, result: BOOLEAN;
-    startTime, endTime: INTEGER;
+VAR pass : BOOLEAN;
     c : Clock.Clock;
 BEGIN
     pass := TRUE;
@@ -39,11 +38,48 @@ BEGIN
     RETURN pass
 END TestSleep;
 
+PROCEDURE TestMutex(): BOOLEAN;
+VAR pass, result: BOOLEAN;
+    mutex: artPThread.Mutex;
+BEGIN
+    pass := TRUE;
+    Out.String("  TestMutex...");
+    
+    (* Test mutex creation *)
+    mutex := artPThread.NewMutex();
+    Tests.ExpectedBool(FALSE, mutex = NIL, "Mutex creation should succeed", pass);
+    
+    IF mutex # NIL THEN
+        (* Test locking *)
+        result := artPThread.Lock(mutex);
+        Tests.ExpectedBool(TRUE, result, "Mutex lock should succeed", pass);
+        
+        (* Test unlocking *)
+        result := artPThread.Unlock(mutex);
+        Tests.ExpectedBool(TRUE, result, "Mutex unlock should succeed", pass);
+        
+        (* Test double lock/unlock *)
+        result := artPThread.Lock(mutex);
+        Tests.ExpectedBool(TRUE, result, "Second mutex lock should succeed", pass);
+        
+        result := artPThread.Unlock(mutex);
+        Tests.ExpectedBool(TRUE, result, "Second mutex unlock should succeed", pass);
+        
+        (* Clean up *)
+        artPThread.FreeMutex(mutex);
+        Tests.ExpectedBool(TRUE, mutex = NIL, "Mutex should be NIL after FreeMutex", pass)
+    END;
+    
+    IF pass THEN Out.String(" OK") ELSE Out.String(" FAILED") END; Out.Ln;
+    RETURN pass
+END TestMutex;
+
 BEGIN
     Tests.Init(ts, "artPThread");
     Out.String("Running artPThread Tests..."); Out.Ln;
     
     Tests.Add(ts, TestSleep);
+    Tests.Add(ts, TestMutex);
     
     ASSERT(Tests.Run(ts));
     Out.String("artPThread Tests Completed."); Out.Ln;
