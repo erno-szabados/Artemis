@@ -1,0 +1,69 @@
+(**
+    artPThread.obn - POSIX threads wrapper for OBNC
+    
+    Provides basic pthread functionality for CSP implementation.
+    
+    Copyright (C) 2025
+    Released under The 3-Clause BSD License.
+*)
+MODULE artPThread;
+
+TYPE
+    (** Opaque mutex type *)
+    Mutex* = POINTER TO MutexDesc;
+    MutexDesc = RECORD
+        handle: INTEGER  (* Will hold pthread_mutex_t pointer *)
+    END;
+    
+    (** Opaque condition variable type *)
+    CondVar* = POINTER TO CondVarDesc;
+    CondVarDesc = RECORD
+        handle: INTEGER  (* Will hold pthread_cond_t pointer *)
+    END;
+    
+    (** Opaque thread type *)
+    Thread* = POINTER TO ThreadDesc;
+    ThreadDesc = RECORD
+        handle: INTEGER  (* Will hold pthread_t *)
+    END;
+
+(** Create a new mutex *)
+PROCEDURE NewMutex*(): Mutex;
+
+(** Destroy a mutex *)
+PROCEDURE FreeMutex*(VAR mutex: Mutex);
+
+(** Lock a mutex (blocking) *)
+PROCEDURE Lock*(mutex: Mutex): BOOLEAN;
+
+(** Unlock a mutex *)
+PROCEDURE Unlock*(mutex: Mutex): BOOLEAN;
+
+(** Try to lock a mutex (non-blocking) *)
+PROCEDURE TryLock*(mutex: Mutex): BOOLEAN;
+
+(** Create a new condition variable *)
+PROCEDURE NewCondVar*(): CondVar;
+
+(** Destroy a condition variable *)
+PROCEDURE FreeCondVar*(VAR cv: CondVar);
+
+(** Wait on a condition variable (releases mutex, reacquires on wake) *)
+PROCEDURE Wait*(cv: CondVar; mutex: Mutex): BOOLEAN;
+
+(** Signal one waiting thread *)
+PROCEDURE Signal*(cv: CondVar): BOOLEAN;
+
+(** Signal all waiting threads *)
+PROCEDURE Broadcast*(cv: CondVar): BOOLEAN;
+
+(** Create a new thread *)
+PROCEDURE NewThread*(proc: PROCEDURE): Thread;
+
+(** Wait for thread to finish *)
+PROCEDURE Join*(thread: Thread): BOOLEAN;
+
+(** Sleep for milliseconds *)
+PROCEDURE Sleep*(ms: INTEGER);
+
+END artPThread.
