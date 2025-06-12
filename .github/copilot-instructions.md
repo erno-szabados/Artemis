@@ -40,3 +40,26 @@
 - Exported procedures documentation comment lines start with `(**` and end with `*)`, so obncdoc finds them.
 - Internal procedures documentation comment lines start with `(*` and end with `*)`, so they are not included in the API documentation.
 - The header should contain a copyright notice for the 3 clause BSD license, the module name, a brief description, and the author.
+
+## Creating C wrappers
+
+1. Create a file named M.obn with the the exported declarations.
+   Proper Procedures should have empty bodies to satisfy syntax requirements.
+   Example: `PROCEDURE MyProc; BEGIN END MyProc;` 
+   Function procedures should have a dummy return value to satisfy syntax requirements.
+   Example: `PROCEDURE MyFunc() : BOOLEAN; BEGIN RETURN TRUE END MyFunc;` 
+
+2. Create a file named MTest.obn which imports M (and preferably  write
+    unit tests for M)
+3. Build MTest with the command
+        obnc MTest.obn
+4. Copy the generated file .obnc/M.c to the current directory. In M.c,
+    delete the generator comment on the first line and change  the  path
+    in the include directive from M.h to .obnc/M.h.
+5. Implement M.c.
+
+### Notes on C Wrappers
+
+1. The initialization function M__Init is called each time a client
+  module imports M. Its statements should therefore be  guarded  with an
+  initialization flag to make sure they are executed only once.
