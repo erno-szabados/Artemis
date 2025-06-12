@@ -192,19 +192,69 @@ void artPThread__FreeCondVar_(artPThread__CondVar_ *cv_)
 
 int artPThread__Wait_(artPThread__CondVar_ cv_, artPThread__Mutex_ mutex_)
 {
-	return 0;
+	pthread_cond_t *pcv;
+	pthread_mutex_t *pmutex;
+
+	if (cv_ == NULL || mutex_ == NULL) {
+		return 0; /* FALSE - invalid condvar or mutex */
+	}
+
+	pcv = (pthread_cond_t *)(uintptr_t)cv_->handle_;
+	pmutex = (pthread_mutex_t *)(uintptr_t)mutex_->handle_;
+
+	if (pcv == NULL || pmutex == NULL) {
+		return 0; /* FALSE - invalid handle */
+	}
+
+	if (pthread_cond_wait(pcv, pmutex) == 0) {
+		return 1; /* TRUE - success */
+	} else {
+		return 0; /* FALSE - wait failed */
+	}
 }
 
 
 int artPThread__Signal_(artPThread__CondVar_ cv_)
 {
-	return 1;
+	pthread_cond_t *pcv;
+
+	if (cv_ == NULL) {
+		return 0; /* FALSE - invalid condvar */
+	}
+
+	pcv = (pthread_cond_t *)(uintptr_t)cv_->handle_;
+
+	if (pcv == NULL) {
+		return 0; /* FALSE - invalid handle */
+	}
+
+	if (pthread_cond_signal(pcv) == 0) {
+		return 1; /* TRUE - success */
+	} else {
+		return 0; /* FALSE - signal failed */
+	}
 }
 
 
 int artPThread__Broadcast_(artPThread__CondVar_ cv_)
 {
-	return 0;
+	pthread_cond_t *pcv;
+
+	if (cv_ == NULL) {
+		return 0; /* FALSE - invalid condvar */
+	}
+
+	pcv = (pthread_cond_t *)(uintptr_t)cv_->handle_;
+
+	if (pcv == NULL) {
+		return 0; /* FALSE - invalid handle */
+	}
+
+	if (pthread_cond_broadcast(pcv) == 0) {
+		return 1; /* TRUE - success */
+	} else {
+		return 0; /* FALSE - broadcast failed */
+	}
 }
 
 
