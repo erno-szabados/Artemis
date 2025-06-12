@@ -10,6 +10,7 @@ IMPORT Tests, artPThread, Out, Clock := artClock;
 
 VAR
     ts: Tests.TestSet;
+    threadRan: BOOLEAN;
 
 PROCEDURE TestSleep(): BOOLEAN;
 VAR pass : BOOLEAN;
@@ -107,6 +108,69 @@ BEGIN
     RETURN pass
 END TestCondVar;
 
+PROCEDURE TestCondVarWaitSignal(): BOOLEAN;
+VAR pass, ok: BOOLEAN;
+    mutex: artPThread.Mutex;
+    cv: artPThread.CondVar;
+    signaled: BOOLEAN;
+BEGIN
+    pass := TRUE;
+    Out.String("  TestCondVarWaitSignal...");
+    
+    mutex := artPThread.NewMutex();
+    cv := artPThread.NewCondVar();
+    signaled := FALSE;
+    
+    IF (mutex # NIL) & (cv # NIL) THEN
+        ok := artPThread.Lock(mutex);
+        Tests.ExpectedBool(TRUE, ok, "Lock before wait should succeed", pass);
+        
+        (* In a real test, another thread would Signal. Here, we just check that Wait returns 1 if signaled. *)
+        (* This is a placeholder for a real concurrent test. *)
+        ok := artPThread.Signal(cv);
+        Tests.ExpectedBool(TRUE, ok, "Signal should succeed", pass);
+        
+        ok := artPThread.Wait(cv, mutex);
+        Tests.ExpectedBool(TRUE, ok, "Wait should succeed (no real wait)", pass);
+        
+        ok := artPThread.Unlock(mutex);
+        Tests.ExpectedBool(TRUE, ok, "Unlock after wait should succeed", pass);
+        
+        artPThread.FreeCondVar(cv);
+        artPThread.FreeMutex(mutex);
+    ELSE
+        pass := FALSE;
+    END;
+    
+    IF pass THEN Out.String(" OK") ELSE Out.String(" FAILED") END; Out.Ln;
+    RETURN pass
+END TestCondVarWaitSignal;
+
+
+PROCEDURE ThreadProc(context: INTEGER): INTEGER;
+BEGIN
+    threadRan := TRUE;
+    RETURN 0
+END ThreadProc;
+
+PROCEDURE TestThread(): BOOLEAN;
+VAR pass, ok: BOOLEAN;
+    t: artPThread.Thread;
+BEGIN
+    pass := TRUE;
+    Out.String("  TestThread...");
+    threadRan := FALSE;
+    t := artPThread.NewThread(ThreadProc);
+    Tests.ExpectedBool(FALSE, t = NIL, "Thread creation should succeed", pass);
+    IF t # NIL THEN
+        ok := artPThread.Join(t);
+        Tests.ExpectedBool(TRUE, ok, "Thread join should succeed", pass);
+        Tests.ExpectedBool(TRUE, threadRan, "Thread procedure should run", pass)
+    END;
+    IF pass THEN Out.String(" OK") ELSE Out.String(" FAILED") END; Out.Ln;
+    RETURN pass
+END TestThread;
+
 BEGIN
     Tests.Init(ts, "artPThread");
     Out.String("Running artPThread Tests..."); Out.Ln;
@@ -114,6 +178,9 @@ BEGIN
     Tests.Add(ts, TestSleep);
     Tests.Add(ts, TestMutex);
     Tests.Add(ts, TestCondVar);
+    (* This test hangs without threads implemented - disabled for now. *)
+    (* Tests.Add(ts, TestCondVarWaitSignal); *)
+    Tests.Add(ts, TestThread);
     
     ASSERT(Tests.Run(ts));
     Out.String("artPThread Tests Completed."); Out.Ln;

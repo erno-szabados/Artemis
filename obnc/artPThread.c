@@ -258,15 +258,71 @@ int artPThread__Broadcast_(artPThread__CondVar_ cv_)
 }
 
 
-artPThread__Thread_ artPThread__NewThread_(artPThread__ThreadProc_ proc_)
+struct artPThread__ThreadStartArg {
+	artPThread__ThreadProc_ proc_;
+};
+
+static void *artPThread__ThreadTrampoline(void *arg)
 {
-	return 0;
+	struct artPThread__ThreadStartArg *startArg = (struct artPThread__ThreadStartArg *)arg;
+	if (startArg && startArg->proc_) {
+		startArg->proc_(0); // Call with dummy argument
+	}
+	free(startArg);
+	return NULL;
 }
 
+artPThread__Thread_ artPThread__NewThread_(artPThread__ThreadProc_ proc_)
+{
+	artPThread__Thread_ thread;
+	pthread_t *pth;
+	struct artPThread__ThreadStartArg *startArg;
+
+	if (proc_ == NULL) {
+		return NULL;
+	}
+
+	thread = OBNC_Allocate(sizeof(struct artPThread__ThreadDesc_), OBNC_REGULAR_ALLOC);
+	pth = malloc(sizeof(pthread_t));
+	if (thread == NULL || pth == NULL) {
+		if (pth) free(pth);
+		return NULL;
+	}
+
+	startArg = malloc(sizeof(struct artPThread__ThreadStartArg));
+	if (startArg == NULL) {
+		free(pth);
+		return NULL;
+	}
+	startArg->proc_ = proc_;
+
+	if (pthread_create(pth, NULL, artPThread__ThreadTrampoline, startArg) != 0) {
+		free(pth);
+		free(startArg);
+		return NULL;
+	}
+
+	thread->handle_ = (OBNC_INTEGER)(uintptr_t)pth;
+	return thread;
+}
 
 int artPThread__Join_(artPThread__Thread_ thread_)
 {
-	return 0;
+	pthread_t *pth;
+	if (thread_ == NULL) {
+		return 0;
+	}
+	pth = (pthread_t *)(uintptr_t)thread_->handle_;
+	if (pth == NULL) {
+		return 0;
+	}
+	if (pthread_join(*pth, NULL) == 0) {
+		free(pth);
+		thread_->handle_ = 0;
+		return 1;
+	} else {
+		return 0;
+	}
 }
 
 
