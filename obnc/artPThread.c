@@ -144,12 +144,49 @@ int artPThread__TryLock_(artPThread__Mutex_ mutex_)
 
 artPThread__CondVar_ artPThread__NewCondVar_(void)
 {
-	return 0;
+	artPThread__CondVar_ cv;
+	pthread_cond_t *pcv;
+
+	/* Allocate memory for the condvar record */
+	cv = OBNC_Allocate(sizeof(struct artPThread__CondVarDesc_), OBNC_REGULAR_ALLOC);
+
+	/* Allocate memory for pthread_cond_t */
+	pcv = malloc(sizeof(pthread_cond_t));
+	if (pcv == NULL) {
+		return NULL; /* Memory allocation failed */
+	}
+
+	/* Initialize the condvar */
+	if (pthread_cond_init(pcv, NULL) != 0) {
+		free(pcv);
+		return NULL; /* Initialization failed */
+	}
+
+	/* Store the pthread_cond_t pointer as handle */
+	cv->handle_ = (OBNC_INTEGER)(uintptr_t)pcv;
+
+	return cv;
 }
 
 
 void artPThread__FreeCondVar_(artPThread__CondVar_ *cv_)
 {
+	pthread_cond_t *pcv;
+
+	if (cv_ != NULL && *cv_ != NULL) {
+		/* Get the pthread_cond_t pointer from handle */
+		pcv = (pthread_cond_t *)(uintptr_t)(*cv_)->handle_;
+
+		if (pcv != NULL) {
+			/* Destroy the condvar */
+			pthread_cond_destroy(pcv);
+			/* Free the allocated memory */
+			free(pcv);
+		}
+
+		/* Set the pointer to NULL */
+		*cv_ = NULL;
+	}
 }
 
 

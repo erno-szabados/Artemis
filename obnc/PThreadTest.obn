@@ -86,12 +86,34 @@ BEGIN
     RETURN pass
 END TestMutex;
 
+PROCEDURE TestCondVar(): BOOLEAN;
+VAR pass: BOOLEAN;
+    cv: artPThread.CondVar;
+BEGIN
+    pass := TRUE;
+    Out.String("  TestCondVar...");
+    
+    (* Test condvar creation *)
+    cv := artPThread.NewCondVar();
+    Tests.ExpectedBool(FALSE, cv = NIL, "CondVar creation should succeed", pass);
+    
+    IF cv # NIL THEN
+        (* Clean up *)
+        artPThread.FreeCondVar(cv);
+        Tests.ExpectedBool(TRUE, cv = NIL, "CondVar should be NIL after FreeCondVar", pass)
+    END;
+    
+    IF pass THEN Out.String(" OK") ELSE Out.String(" FAILED") END; Out.Ln;
+    RETURN pass
+END TestCondVar;
+
 BEGIN
     Tests.Init(ts, "artPThread");
     Out.String("Running artPThread Tests..."); Out.Ln;
     
     Tests.Add(ts, TestSleep);
     Tests.Add(ts, TestMutex);
+    Tests.Add(ts, TestCondVar);
     
     ASSERT(Tests.Run(ts));
     Out.String("artPThread Tests Completed."); Out.Ln;
