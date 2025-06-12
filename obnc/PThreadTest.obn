@@ -6,11 +6,16 @@
 *)
 MODULE PThreadTest;
 
-IMPORT Tests, artPThread, Out, Clock := artClock;
+IMPORT Tests, artPThread, Out, Clock := artClock, SYSTEM;
+
+TYPE
+    ThreadContext = POINTER TO ThreadContextDesc;
+    ThreadContextDesc = RECORD
+        ran: BOOLEAN
+    END;
 
 VAR
     ts: Tests.TestSet;
-    threadRan: BOOLEAN;
 
 PROCEDURE TestSleep(): BOOLEAN;
 VAR pass : BOOLEAN;
@@ -148,26 +153,30 @@ END TestCondVarWaitSignal;
 
 
 PROCEDURE ThreadProc(context: INTEGER): INTEGER;
+VAR ctx: ThreadContext;
 BEGIN
-    threadRan := TRUE;
+    ctx := SYSTEM.VAL(ThreadContext, context);
+    IF ctx # NIL THEN
+        ctx.ran := TRUE;
+    END;
     RETURN 0
 END ThreadProc;
 
 PROCEDURE TestThread(): BOOLEAN;
 VAR pass, ok: BOOLEAN;
     t: artPThread.Thread;
-    context : INTEGER;
+    ctx: ThreadContext;
 BEGIN
-    context := 0;
+    NEW(ctx);
+    ctx.ran := FALSE;
     pass := TRUE;
     Out.String("  TestThread...");
-    threadRan := FALSE;
-    t := artPThread.NewThread(ThreadProc, context);
+    t := artPThread.NewThread(ThreadProc, SYSTEM.VAL(INTEGER, ctx));
     Tests.ExpectedBool(FALSE, t = NIL, "Thread creation should succeed", pass);
     IF t # NIL THEN
         ok := artPThread.Join(t);
         Tests.ExpectedBool(TRUE, ok, "Thread join should succeed", pass);
-        Tests.ExpectedBool(TRUE, threadRan, "Thread procedure should run", pass)
+        Tests.ExpectedBool(TRUE, ctx.ran, "Thread procedure should set context field", pass)
     END;
     IF pass THEN Out.String(" OK") ELSE Out.String(" FAILED") END; Out.Ln;
     RETURN pass
