@@ -1,0 +1,41 @@
+(**
+    PThreadTest.Mod - Unit tests for MINIMAL artPThread module
+    
+    Copyright (C) 2025
+    Released under The 3-Clause BSD License.
+*)
+MODULE PThreadTest;
+
+IMPORT Tests, artPThread, Out;
+
+VAR
+    ts: Tests.TestSet;
+
+PROCEDURE TestMinimalPThreadProc(): BOOLEAN;
+VAR pass, result: BOOLEAN;
+    cv : artPThread.CondVar;
+BEGIN
+    pass := TRUE;
+    result := FALSE;
+    Out.String("  TestMinimalPThreadProc...");
+    NEW(cv);
+    
+    result := artPThread.Signal(cv); (* Call the minimal procedure *)
+    
+    (* This test primarily checks if the call can be made without crashing,
+       indicating successful linking and C interop. *)
+    Tests.ExpectedBool(TRUE, result, "Call to artPThread.Signal completed", pass);
+    
+    IF pass THEN Out.String(" OK") ELSE Out.String(" FAILED") END; Out.Ln;
+    RETURN pass
+END TestMinimalPThreadProc;
+
+BEGIN
+    Tests.Init(ts, "artPThread (Minimal)");
+    Out.String("Running artPThread (Minimal) Tests..."); Out.Ln;
+    
+    Tests.Add(ts, TestMinimalPThreadProc);
+    
+    ASSERT(Tests.Run(ts));
+    Out.String("artPThread (Minimal) Tests Completed."); Out.Ln;
+END PThreadTest.

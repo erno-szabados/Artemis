@@ -27,43 +27,96 @@ TYPE
         handle: INTEGER  (* Will hold pthread_t *)
     END;
 
+    (** Pointer to a Thread Procedure, taking a SYSTEM.ADR and returning a SYSTEM.ADR void* -> void* *)
+    ThreadProc* = PROCEDURE(contextPtr: INTEGER): INTEGER;
+
+
 (** Create a new mutex *)
 PROCEDURE NewMutex*(): Mutex;
+BEGIN
+    (* Formal body, C implementation takes precedence. *)
+    RETURN NIL
+END NewMutex;
 
 (** Destroy a mutex *)
 PROCEDURE FreeMutex*(VAR mutex: Mutex);
+BEGIN
+    (* Formal body, C implementation takes precedence. *)
+END FreeMutex;
 
 (** Lock a mutex (blocking) *)
 PROCEDURE Lock*(mutex: Mutex): BOOLEAN;
+BEGIN
+    (* Formal body, C implementation takes precedence. *)
+    RETURN FALSE
+END Lock;
 
 (** Unlock a mutex *)
 PROCEDURE Unlock*(mutex: Mutex): BOOLEAN;
+BEGIN
+    (* Formal body, C implementation takes precedence. *)
+    RETURN FALSE
+END Unlock;
 
 (** Try to lock a mutex (non-blocking) *)
 PROCEDURE TryLock*(mutex: Mutex): BOOLEAN;
+BEGIN
+    (* Formal body, C implementation takes precedence. *)
+    RETURN FALSE
+END TryLock;
 
 (** Create a new condition variable *)
 PROCEDURE NewCondVar*(): CondVar;
+BEGIN
+    (* Formal body, C implementation takes precedence. *)
+    RETURN NIL
+END NewCondVar;
 
 (** Destroy a condition variable *)
 PROCEDURE FreeCondVar*(VAR cv: CondVar);
+BEGIN
+    (* Formal body, C implementation takes precedence. *)
+END FreeCondVar;
 
 (** Wait on a condition variable (releases mutex, reacquires on wake) *)
 PROCEDURE Wait*(cv: CondVar; mutex: Mutex): BOOLEAN;
+BEGIN
+    (* Formal body, C implementation takes precedence. *)
+    RETURN FALSE
+END Wait;
 
 (** Signal one waiting thread *)
 PROCEDURE Signal*(cv: CondVar): BOOLEAN;
+BEGIN
+    (* Formal body, C implementation takes precedence. *)
+    RETURN FALSE
+END Signal;
 
 (** Signal all waiting threads *)
 PROCEDURE Broadcast*(cv: CondVar): BOOLEAN;
+BEGIN
+    (* Formal body, C implementation takes precedence. *)
+    RETURN FALSE
+END Broadcast;
 
 (** Create a new thread *)
-PROCEDURE NewThread*(proc: PROCEDURE): Thread;
+PROCEDURE NewThread*(proc: ThreadProc): Thread;
+BEGIN
+    (* Formal body, C implementation takes precedence. *)
+    RETURN NIL
+END NewThread;
 
 (** Wait for thread to finish *)
 PROCEDURE Join*(thread: Thread): BOOLEAN;
+BEGIN
+    (* Formal body, C implementation takes precedence. *)
+    RETURN FALSE
+END Join;
 
 (** Sleep for milliseconds *)
 PROCEDURE Sleep*(ms: INTEGER);
+BEGIN
+    (* Formal body, C implementation takes precedence. *)
+END Sleep;
 
 END artPThread.
