@@ -120,7 +120,25 @@ int artPThread__Unlock_(artPThread__Mutex_ mutex_)
 
 int artPThread__TryLock_(artPThread__Mutex_ mutex_)
 {
-	return 0;
+	pthread_mutex_t *pmutex;
+
+	if (mutex_ == NULL) {
+		return 0; /* FALSE - invalid mutex */
+	}
+
+	/* Get the pthread_mutex_t pointer from handle */
+	pmutex = (pthread_mutex_t *)(uintptr_t)mutex_->handle_;
+
+	if (pmutex == NULL) {
+		return 0; /* FALSE - invalid handle */
+	}
+
+	/* Try to lock the mutex (non-blocking) */
+	if (pthread_mutex_trylock(pmutex) == 0) {
+		return 1; /* TRUE - success */
+	} else {
+		return 0; /* FALSE - already locked or error */
+	}
 }
 
 

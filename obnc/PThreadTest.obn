@@ -65,6 +65,18 @@ BEGIN
         result := artPThread.Unlock(mutex);
         Tests.ExpectedBool(TRUE, result, "Second mutex unlock should succeed", pass);
         
+        (* Test TryLock on unlocked mutex *)
+        result := artPThread.TryLock(mutex);
+        Tests.ExpectedBool(TRUE, result, "TryLock should succeed on unlocked mutex", pass);
+
+        (* Test TryLock on already locked mutex *)
+        result := artPThread.TryLock(mutex);
+        Tests.ExpectedBool(FALSE, result, "TryLock should fail on already locked mutex", pass);
+
+        (* Unlock for cleanup *)
+        result := artPThread.Unlock(mutex);
+        Tests.ExpectedBool(TRUE, result, "Unlock after TryLock should succeed", pass);
+        
         (* Clean up *)
         artPThread.FreeMutex(mutex);
         Tests.ExpectedBool(TRUE, mutex = NIL, "Mutex should be NIL after FreeMutex", pass)
