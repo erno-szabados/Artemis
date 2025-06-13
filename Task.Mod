@@ -1,6 +1,22 @@
 (**
-    CSPCoop.Mod - Minimal cooperative CSP scheduler with buffered message passing
+    Task.Mod - Cooperative task scheduler with stackless coroutines and channels
+    
+    Implements stackless coroutines using resume points and case statements.
     Suitable for MCUs and single-core systems. No threads, no blocking, no preemption.
+    
+    Usage Pattern (Oberon-07 compliant):
+    
+    PROCEDURE MyTask(ctx: TaskContext);
+    VAR myCtx: MyContext;
+    BEGIN
+      myCtx := ctx(MyContext);
+      
+      CASE myCtx.resumePoint OF
+      | 0: (* Phase 0 *) DoInitialization; Yield(ctx)
+      | 1: (* Phase 1 *) DoWork; IF moreWork THEN YieldAt(ctx, 1) ELSE Yield(ctx) END  
+      | 2: (* Phase 2 *) DoCleanup (* No yield = finished *)
+      END
+    END MyTask;
     
     Copyright (C) 2025
     Released under The 3-Clause BSD License.
@@ -10,9 +26,16 @@ MODULE Task;
 
 IMPORT Collections, Queue;
 
+CONST 
+    READY = 0; 
+    RUNNING = 1;
+    YIELDED = 2;
+    FINISHED = 3;
+
 TYPE
     TaskContext* = POINTER TO TaskContextDesc;
-    TaskContextDesc* = RECORD
+    TaskContextDesc* = RECORD (Collections.Item)
+        resumePoint*: INTEGER
     END;
 
     TaskProc* = PROCEDURE (ctx : TaskContext);
@@ -20,7 +43,8 @@ TYPE
 
     TaskDesc = RECORD (Collections.Item)
         proc: TaskProc;
-        context: TaskContext
+        context: TaskContext;
+        state: INTEGER
     END;
     Scheduler* = POINTER TO SchedulerDesc;
     SchedulerDesc = RECORD
@@ -32,6 +56,10 @@ TYPE
         buffer: Queue.Queue;
         capacity: INTEGER
     END;
+
+VAR
+    currentTask: Task;
+    yieldRequested: BOOLEAN;
 
 (* Create a new scheduler *)
 PROCEDURE NewScheduler*(): Scheduler;
@@ -48,27 +76,64 @@ PROCEDURE AddTask*(sched: Scheduler; proc: TaskProc; ctx : TaskContext);
 VAR t: Task;
 BEGIN
     IF (sched # NIL) & (proc # NIL) THEN
-        NEW(t); t.proc := proc; t.context := ctx;
+        NEW(t); 
+        t.proc := proc; 
+        t.context := ctx;
+        t.state := READY;
+        IF ctx # NIL THEN ctx.resumePoint := 0 END;
         Queue.Enqueue(sched.tasks, t)
     END
 END AddTask;
 
-(* Yield control to the next task *)
-PROCEDURE Yield*();
+(* Yield control to the next task (auto-increment resume point) *)
+PROCEDURE Yield*(ctx: TaskContext);
 BEGIN
-    (* In a real implementation, this would switch to the next task. Here, it's a no-op placeholder. *)
+    IF (currentTask # NIL) & (ctx # NIL) THEN
+        INC(ctx.resumePoint);
+        currentTask.state := YIELDED;
+        yieldRequested := TRUE
+    END
 END Yield;
 
-(* Run the scheduler (simple round-robin) *)
+(* Yield control and set specific resume point *)
+PROCEDURE YieldAt*(ctx: TaskContext; point: INTEGER);
+BEGIN
+    IF (currentTask # NIL) & (ctx # NIL) THEN
+        ctx.resumePoint := point;
+        currentTask.state := YIELDED;
+        yieldRequested := TRUE
+    END
+END YieldAt;
+
+(* Run the scheduler with stackless coroutine support *)
 PROCEDURE Run*(sched: Scheduler);
-VAR t: Collections.ItemPtr;
+VAR t: Collections.ItemPtr; task: Task;
 BEGIN
     IF sched # NIL THEN
         WHILE ~Queue.IsEmpty(sched.tasks) DO
             Queue.Dequeue(sched.tasks, t);
-            IF t # NIL THEN
-                sched.current := t(Task);
-                IF sched.current.proc # NIL THEN sched.current.proc(t(Task).context) END
+            task := t(Task);
+            
+            IF task.state # FINISHED THEN
+                currentTask := task;
+                task.state := RUNNING;
+                yieldRequested := FALSE;
+                
+                (* Run the task *)
+                IF task.proc # NIL THEN
+                    task.proc(task.context)
+                END;
+                
+                (* Check what happened *)
+                IF yieldRequested THEN
+                    (* Task yielded, put it back in queue *)
+                    Queue.Enqueue(sched.tasks, task)
+                ELSE
+                    (* Task completed without yielding *)
+                    task.state := FINISHED
+                END;
+                
+                currentTask := NIL
             END
         END
     END
@@ -109,4 +174,7 @@ BEGIN
     RETURN result
 END Receive;
 
+BEGIN
+    currentTask := NIL;
+    yieldRequested := FALSE
 END Task.
