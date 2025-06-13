@@ -6,7 +6,7 @@
 *)
 MODULE TaskTest;
 
-IMPORT Task, Tests, Out, Collections;
+IMPORT Task, Tests, Collections;
 
 TYPE
     (** Wrapper for INTEGER - a Collections.Item *)
