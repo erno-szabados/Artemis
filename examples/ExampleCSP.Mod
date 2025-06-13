@@ -9,7 +9,7 @@
 *)
 MODULE ExampleCSP;
 
-IMPORT CSP, Collections, Out, Chars, artPThread;
+IMPORT CSP := CSPThreads, Collections, Out, Chars, artPThread;
 
 TYPE
     (* Example message types *)
