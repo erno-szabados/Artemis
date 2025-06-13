@@ -51,7 +51,7 @@ BEGIN
 END NewNumberMessage;
 
 (** Basic channel operations example *)
-PROCEDURE DemonstrateBasicChannels*();
+PROCEDURE DemonstrateBasicChannels();
 VAR
     ch: CSP.Channel;
     msg: StringMessagePtr;
@@ -123,7 +123,7 @@ BEGIN
 END DemonstrateBasicChannels;
 
 (** Synchronous channel example *)
-PROCEDURE DemonstrateSynchronousChannels*();
+PROCEDURE DemonstrateSynchronousChannels();
 VAR
     syncCh: CSP.Channel;
     msg: NumberMessagePtr;
@@ -154,7 +154,7 @@ BEGIN
 END DemonstrateSynchronousChannels;
 
 (** Channel closing example *)
-PROCEDURE DemonstrateChannelClosing*();
+PROCEDURE DemonstrateChannelClosing();
 VAR
     ch: CSP.Channel;
     msg: StringMessagePtr;
@@ -244,7 +244,7 @@ BEGIN
 END ConsumerProcess;
 
 (** Process and scheduler example *)
-PROCEDURE DemonstrateProcesses*();
+PROCEDURE DemonstrateProcesses();
 VAR
     producer, consumer: CSP.Process;
     msg: NumberMessagePtr;
@@ -317,7 +317,7 @@ BEGIN
 END StatusProcess;
 
 (** Demonstrate multiple concurrent processes *)
-PROCEDURE DemonstrateMultipleProcesses*();
+PROCEDURE DemonstrateMultipleProcesses();
 VAR
     status1, status2, status3: CSP.Process;
     multiScheduler: CSP.Scheduler;
@@ -378,7 +378,7 @@ BEGIN
     Out.String("[BlockingConsumer] Finished (received "); Out.Int(count, 0); Out.String(" messages)"); Out.Ln
 END BlockingConsumerProcess;
 
-PROCEDURE DemonstrateTrueConcurrency*();
+PROCEDURE DemonstrateTrueConcurrency();
 VAR
     prod, cons: CSP.Process;
     i: INTEGER;
@@ -409,7 +409,7 @@ BEGIN
     Out.String("[JoinableProcess] Done!"); Out.Ln
 END JoinableExampleProcess;
 
-PROCEDURE DemonstrateProcessJoin*();
+PROCEDURE DemonstrateProcessJoin();
 VAR proc: CSP.Process; ok: BOOLEAN;
 BEGIN
     Out.String("=== Process Join Demo ==="); Out.Ln;
