@@ -13,7 +13,7 @@ MODULES = $(shell ls -1 *.Mod)
 DOCS= codemeta.json CITATION.cff README.md LICENSE INSTALL.txt
 HTML_FILES=$(shell find . -type f | grep -E '.html')
 
-#OC = env OBNC_IMPORT_PATH="." obnc
+OC = env OBNC_IMPORT_PATH=".:obnc:../obnc" obnc
 # Defaults
 OC = obnc
 OS = $(shell uname)
@@ -82,7 +82,7 @@ $(TEST_NAMES): .FORCE
 
 $(EXAMPLE_NAMES): .FORCE
 	@mkdir -p examples/bin
-	cd examples && env OBNC_IMPORT_PATH="../" $(OC) -o "bin/$@$(EXT)" "$@.Mod"
+	cd examples && env OBNC_IMPORT_PATH="../:../obnc" $(OC) -o "bin/$@$(EXT)" "$@.Mod"
 
 full_test: .FORCE clean test
 
