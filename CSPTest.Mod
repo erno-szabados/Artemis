@@ -230,7 +230,7 @@ BEGIN
 END TestProcessJoin;
 
 BEGIN
-    Tests.Init(ts, "CSP");
+    Tests.Init(ts, "CSP Tests");
     Tests.Add(ts, TestChannelCreation);
     Tests.Add(ts, TestNonBlockingOperations);
     Tests.Add(ts, TestSynchronousChannel);

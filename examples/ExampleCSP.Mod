@@ -51,7 +51,7 @@ BEGIN
 END NewNumberMessage;
 
 (** Basic channel operations example *)
-PROCEDURE DemonstratBasicChannels*();
+PROCEDURE DemonstrateBasicChannels*();
 VAR
     ch: CSP.Channel;
     msg: StringMessagePtr;
@@ -120,10 +120,10 @@ BEGIN
     Out.Ln;
     
     Out.Ln
-END DemonstratBasicChannels;
+END DemonstrateBasicChannels;
 
 (** Synchronous channel example *)
-PROCEDURE DemonstratSynchronousChannels*();
+PROCEDURE DemonstrateSynchronousChannels*();
 VAR
     syncCh: CSP.Channel;
     msg: NumberMessagePtr;
@@ -151,7 +151,7 @@ BEGIN
     
     Out.String("Note: Synchronous channels require coordination between sender and receiver"); Out.Ln;
     Out.Ln
-END DemonstratSynchronousChannels;
+END DemonstrateSynchronousChannels;
 
 (** Channel closing example *)
 PROCEDURE DemonstrateChannelClosing*();
@@ -431,8 +431,8 @@ BEGIN
     Out.String("=================================================="); Out.Ln;
     Out.Ln;
     
-    DemonstratBasicChannels();
-    DemonstratSynchronousChannels();
+    DemonstrateBasicChannels();
+    DemonstrateSynchronousChannels();
     DemonstrateChannelClosing();
     DemonstrateProcesses();
     DemonstrateMultipleProcesses();
