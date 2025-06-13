@@ -9,7 +9,7 @@
 *)
 MODULE ExampleCSP;
 
-IMPORT CSP, Collections, Out, Chars;
+IMPORT CSP, Collections, Out, Chars, artPThread;
 
 TYPE
     (* Example message types *)
@@ -27,7 +27,7 @@ TYPE
 
 VAR
     (* Global channels for examples *)
-    stringChannel, numberChannel: CSP.Channel;
+    numberChannel: CSP.Channel;
     scheduler: CSP.Scheduler;
 
 (** Helper to create a string message *)
@@ -343,6 +343,60 @@ BEGIN
     Out.Ln
 END DemonstrateMultipleProcesses;
 
+(* --- True concurrent producer-consumer demo --- *)
+PROCEDURE BlockingProducerProcess();
+VAR 
+    msg: NumberMessagePtr;
+    i: INTEGER;
+BEGIN
+    Out.String("[BlockingProducer] Starting..."); Out.Ln;
+    FOR i := 1 TO 5 DO
+        msg := NewNumberMessage(i * 10, i);
+        CSP.Send(numberChannel, msg);
+        Out.String("[BlockingProducer] Sent value "); Out.Int(i * 10, 0); Out.Ln
+    END;
+    Out.String("[BlockingProducer] Finished"); Out.Ln
+END BlockingProducerProcess;
+
+PROCEDURE BlockingConsumerProcess();
+VAR 
+    result: Collections.ItemPtr;
+    count: INTEGER;
+BEGIN
+    Out.String("[BlockingConsumer] Starting..."); Out.Ln;
+    count := 0;
+    WHILE count < 5 DO
+        CSP.Receive(numberChannel, result);
+        IF result # NIL THEN
+            Out.String("[BlockingConsumer] Received value "); 
+            Out.Int(result(NumberMessagePtr).value, 0);
+            Out.String(" (sequence: "); Out.Int(result(NumberMessagePtr).sequence, 0); Out.String(")");
+            Out.Ln;
+            INC(count)
+        END
+    END;
+    Out.String("[BlockingConsumer] Finished (received "); Out.Int(count, 0); Out.String(" messages)"); Out.Ln
+END BlockingConsumerProcess;
+
+PROCEDURE DemonstrateTrueConcurrency*();
+VAR
+    prod, cons: CSP.Process;
+    i: INTEGER;
+BEGIN
+    Out.String("=== True Concurrency Demo ==="); Out.Ln;
+    numberChannel := CSP.NewChannel(2);
+    Out.String("Created shared channel for blocking producer-consumer"); Out.Ln;
+    prod := CSP.NewProcess(BlockingProducerProcess);
+    cons := CSP.NewProcess(BlockingConsumerProcess);
+    Out.String("Created producer and consumer processes (threads)"); Out.Ln;
+    (* Let threads run concurrently; join by sleeping main thread *)
+    FOR i := 1 TO 10 DO
+        artPThread.Sleep(100);
+    END;
+    Out.String("Main thread done waiting. (Check output above for interleaving)"); Out.Ln;
+    Out.Ln
+END DemonstrateTrueConcurrency;
+
 (** Main demonstration *)
 PROCEDURE Run*();
 BEGIN
@@ -355,6 +409,7 @@ BEGIN
     DemonstrateChannelClosing();
     DemonstrateProcesses();
     DemonstrateMultipleProcesses();
+    DemonstrateTrueConcurrency();
     
     Out.String("CSP Examples Complete!"); Out.Ln
 END Run;
