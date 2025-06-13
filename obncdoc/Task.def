@@ -1,0 +1,69 @@
+(*
+    Task.Mod - Cooperative task scheduler with stackless coroutines and channels
+    
+    Implements stackless coroutines using resume points and case statements.
+    Suitable for MCUs and single-core systems. No threads, no blocking, no preemption.
+    
+    Usage Pattern (Oberon-07 compliant):
+    
+    PROCEDURE MyTask(ctx: TaskContext);
+    VAR myCtx: MyContext;
+    BEGIN
+      myCtx := ctx(MyContext);
+      
+      CASE myCtx.resumePoint OF
+      | 0: (* Phase 0 *) DoInitialization; Yield(ctx)
+      | 1: (* Phase 1 *) DoWork; IF moreWork THEN YieldAt(ctx, 1) ELSE Yield(ctx) END  
+      | 2: (* Phase 2 *) DoCleanup (* No yield = finished *)
+      END
+    END MyTask;
+    
+    Copyright (C) 2025
+    Released under The 3-Clause BSD License.
+    Author: Artemis Project
+*)
+DEFINITION Task;
+
+IMPORT Collections;
+
+TYPE
+    (* Base context for all tasks - extend this for task-specific data *)
+    TaskContext = POINTER TO TaskContextDesc;
+    TaskContextDesc = RECORD (Collections.Item)
+        resumePoint: INTEGER (* Current resume point for stackless coroutines *)
+    END;
+
+    (* Task procedure signature - receives context as parameter *)
+    TaskProc = PROCEDURE (ctx : TaskContext);
+
+    (* Cooperative task scheduler *)
+    Scheduler = POINTER TO SchedulerDesc;
+
+    (* Buffered communication channel *)
+    Channel = POINTER TO ChannelDesc;
+
+(* Create a new cooperative task scheduler *)
+PROCEDURE NewScheduler(): Scheduler;
+
+(* Add a task to the scheduler with its context *)
+PROCEDURE AddTask(sched: Scheduler; proc: TaskProc; ctx : TaskContext);
+
+(* Yield control to next task and auto-increment resume point *)
+PROCEDURE Yield(ctx: TaskContext);
+
+(* Yield control and set specific resume point for loops/branches *)
+PROCEDURE YieldAt(ctx: TaskContext; point: INTEGER);
+
+(* Run scheduler in round-robin fashion until all tasks complete *)
+PROCEDURE Run(sched: Scheduler);
+
+(* Create a buffered channel for message passing between tasks *)
+PROCEDURE NewChannel(capacity: INTEGER): Channel;
+
+(* Send message to channel - returns FALSE if buffer is full *)
+PROCEDURE Send(ch: Channel; msg: Collections.ItemPtr): BOOLEAN;
+
+(* Receive message from channel - returns FALSE if buffer is empty *)
+PROCEDURE Receive(ch: Channel; VAR msg: Collections.ItemPtr): BOOLEAN;
+
+END Task.

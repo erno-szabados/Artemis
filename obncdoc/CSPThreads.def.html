@@ -1,0 +1,75 @@
+<!DOCTYPE html PUBLIC '-//W3C//DTD XHTML 1.0 Strict//EN' 'http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd'>
+<html xmlns='http://www.w3.org/1999/xhtml' xml:lang='en' lang='en'>
+	<head>
+		<meta name='viewport' content='width=device-width, initial-scale=1.0' />
+		<meta http-equiv='Content-Type' content='text/html; charset=utf-8' />
+		<title>DEFINITION CSPThreads</title>
+		<link rel='stylesheet' type='text/css' href='style.css' />
+	</head>
+	<body>
+		<p><a href='index.html'>Index</a></p>
+
+		<pre>
+<span class='comment'>(*
+    CSPThreads.Mod - True concurrency CSP implementation using PThreads
+    Provides channels and process scheduling with OS threads.
+    
+    Copyright (C) 2025
+    Released under The 3-Clause BSD License.
+    Author: Artemis Project
+*)</span>
+DEFINITION <em>CSPThreads</em>;
+
+IMPORT Collections;
+
+CONST
+    OPEN = 0;
+    CLOSED = 1;
+    READY = 0;
+    RUNNING = 1;
+    BLOCKED = 2;
+    FINISHED = 3;
+
+TYPE
+    Channel = POINTER TO ChannelDesc;
+    ProcessProc = PROCEDURE;
+    Process = POINTER TO ProcessDesc;
+    Waiter = POINTER TO WaiterDesc;
+    Scheduler = POINTER TO SchedulerDesc;
+
+PROCEDURE <em>NewChannel</em>(capacity: INTEGER): Channel;
+
+PROCEDURE <em>FreeChannel</em>(VAR ch: Channel);
+
+PROCEDURE <em>CloseChannel</em>(ch: Channel);
+
+PROCEDURE <em>IsClosed</em>(ch: Channel): BOOLEAN;
+
+PROCEDURE <em>TrySend</em>(ch: Channel; item: Collections.ItemPtr): BOOLEAN;
+
+PROCEDURE <em>TryReceive</em>(ch: Channel; VAR item: Collections.ItemPtr): BOOLEAN;
+
+PROCEDURE <em>Send</em>(ch: Channel; item: Collections.ItemPtr);
+
+PROCEDURE <em>Receive</em>(ch: Channel; VAR item: Collections.ItemPtr);
+
+PROCEDURE <em>NewProcess</em>(proc: ProcessProc): Process;
+
+PROCEDURE <em>NewScheduler</em>(): Scheduler;
+
+PROCEDURE <em>AddProcess</em>(sched: Scheduler; proc: Process);
+
+PROCEDURE <em>JoinProcess</em>(proc: Process): BOOLEAN;
+
+PROCEDURE <em>Yield</em>();
+
+PROCEDURE <em>Run</em>(sched: Scheduler);
+
+PROCEDURE <em>Init</em>();
+
+PROCEDURE <em>DefaultScheduler</em>(): Scheduler;
+
+END CSPThreads.
+</pre>
+	</body>
+</html>

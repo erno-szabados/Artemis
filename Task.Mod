@@ -33,24 +33,31 @@ CONST
     FINISHED = 3;
 
 TYPE
+    (** Base context for all tasks - extend this for task-specific data *)
     TaskContext* = POINTER TO TaskContextDesc;
     TaskContextDesc* = RECORD (Collections.Item)
-        resumePoint*: INTEGER
+        resumePoint*: INTEGER  (** Current resume point for stackless coroutines *)
     END;
 
+    (** Task procedure signature - receives context as parameter *)
     TaskProc* = PROCEDURE (ctx : TaskContext);
+    
+    (* Internal task representation *)
     Task = POINTER TO TaskDesc;
-
     TaskDesc = RECORD (Collections.Item)
         proc: TaskProc;
         context: TaskContext;
         state: INTEGER
     END;
+    
+    (** Cooperative task scheduler *)
     Scheduler* = POINTER TO SchedulerDesc;
     SchedulerDesc = RECORD
         tasks: Queue.Queue;
         current: Task
     END;
+    
+    (** Buffered communication channel *)
     Channel* = POINTER TO ChannelDesc;
     ChannelDesc = RECORD
         buffer: Queue.Queue;
@@ -61,7 +68,7 @@ VAR
     currentTask: Task;
     yieldRequested: BOOLEAN;
 
-(* Create a new scheduler *)
+(** Create a new cooperative task scheduler *)
 PROCEDURE NewScheduler*(): Scheduler;
 VAR sched: Scheduler;
 BEGIN
@@ -71,7 +78,7 @@ BEGIN
     RETURN sched
 END NewScheduler;
 
-(* Add a task to the scheduler *)
+(** Add a task to the scheduler with its context *)
 PROCEDURE AddTask*(sched: Scheduler; proc: TaskProc; ctx : TaskContext);
 VAR t: Task;
 BEGIN
@@ -85,7 +92,7 @@ BEGIN
     END
 END AddTask;
 
-(* Yield control to the next task (auto-increment resume point) *)
+(** Yield control to next task and auto-increment resume point *)
 PROCEDURE Yield*(ctx: TaskContext);
 BEGIN
     IF (currentTask # NIL) & (ctx # NIL) THEN
@@ -95,7 +102,7 @@ BEGIN
     END
 END Yield;
 
-(* Yield control and set specific resume point *)
+(** Yield control and set specific resume point for loops/branches *)
 PROCEDURE YieldAt*(ctx: TaskContext; point: INTEGER);
 BEGIN
     IF (currentTask # NIL) & (ctx # NIL) THEN
@@ -105,7 +112,7 @@ BEGIN
     END
 END YieldAt;
 
-(* Run the scheduler with stackless coroutine support *)
+(** Run scheduler in round-robin fashion until all tasks complete *)
 PROCEDURE Run*(sched: Scheduler);
 VAR t: Collections.ItemPtr; task: Task;
 BEGIN
@@ -139,7 +146,7 @@ BEGIN
     END
 END Run;
 
-(* Create a new buffered channel *)
+(** Create a buffered channel for message passing between tasks *)
 PROCEDURE NewChannel*(capacity: INTEGER): Channel;
 VAR ch: Channel;
 BEGIN
@@ -149,7 +156,7 @@ BEGIN
     RETURN ch
 END NewChannel;
 
-(* Send a message to the channel (FALSE if full) *)
+(** Send message to channel - returns FALSE if buffer is full *)
 PROCEDURE Send*(ch: Channel; msg: Collections.ItemPtr): BOOLEAN;
 VAR result: BOOLEAN;
 BEGIN
@@ -161,7 +168,7 @@ BEGIN
     RETURN result
 END Send;
 
-(* Receive a message from the channel (FALSE if empty) *)
+(** Receive message from channel - returns FALSE if buffer is empty *)
 PROCEDURE Receive*(ch: Channel; VAR msg: Collections.ItemPtr): BOOLEAN;
 VAR result: BOOLEAN;
 BEGIN

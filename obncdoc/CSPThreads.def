@@ -1,0 +1,60 @@
+(*
+    CSPThreads.Mod - True concurrency CSP implementation using PThreads
+    Provides channels and process scheduling with OS threads.
+    
+    Copyright (C) 2025
+    Released under The 3-Clause BSD License.
+    Author: Artemis Project
+*)
+DEFINITION CSPThreads;
+
+IMPORT Collections;
+
+CONST
+    OPEN = 0;
+    CLOSED = 1;
+    READY = 0;
+    RUNNING = 1;
+    BLOCKED = 2;
+    FINISHED = 3;
+
+TYPE
+    Channel = POINTER TO ChannelDesc;
+    ProcessProc = PROCEDURE;
+    Process = POINTER TO ProcessDesc;
+    Waiter = POINTER TO WaiterDesc;
+    Scheduler = POINTER TO SchedulerDesc;
+
+PROCEDURE NewChannel(capacity: INTEGER): Channel;
+
+PROCEDURE FreeChannel(VAR ch: Channel);
+
+PROCEDURE CloseChannel(ch: Channel);
+
+PROCEDURE IsClosed(ch: Channel): BOOLEAN;
+
+PROCEDURE TrySend(ch: Channel; item: Collections.ItemPtr): BOOLEAN;
+
+PROCEDURE TryReceive(ch: Channel; VAR item: Collections.ItemPtr): BOOLEAN;
+
+PROCEDURE Send(ch: Channel; item: Collections.ItemPtr);
+
+PROCEDURE Receive(ch: Channel; VAR item: Collections.ItemPtr);
+
+PROCEDURE NewProcess(proc: ProcessProc): Process;
+
+PROCEDURE NewScheduler(): Scheduler;
+
+PROCEDURE AddProcess(sched: Scheduler; proc: Process);
+
+PROCEDURE JoinProcess(proc: Process): BOOLEAN;
+
+PROCEDURE Yield();
+
+PROCEDURE Run(sched: Scheduler);
+
+PROCEDURE Init();
+
+PROCEDURE DefaultScheduler(): Scheduler;
+
+END CSPThreads.

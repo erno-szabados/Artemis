@@ -1,0 +1,84 @@
+<!DOCTYPE html PUBLIC '-//W3C//DTD XHTML 1.0 Strict//EN' 'http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd'>
+<html xmlns='http://www.w3.org/1999/xhtml' xml:lang='en' lang='en'>
+	<head>
+		<meta name='viewport' content='width=device-width, initial-scale=1.0' />
+		<meta http-equiv='Content-Type' content='text/html; charset=utf-8' />
+		<title>DEFINITION Task</title>
+		<link rel='stylesheet' type='text/css' href='style.css' />
+	</head>
+	<body>
+		<p><a href='index.html'>Index</a></p>
+
+		<pre>
+<span class='comment'>(*
+    Task.Mod - Cooperative task scheduler with stackless coroutines and channels
+    
+    Implements stackless coroutines using resume points and case statements.
+    Suitable for MCUs and single-core systems. No threads, no blocking, no preemption.
+    
+    Usage Pattern (Oberon-07 compliant):
+    
+    PROCEDURE MyTask(ctx: TaskContext);
+    VAR myCtx: MyContext;
+    BEGIN
+      myCtx := ctx(MyContext);
+      
+      CASE myCtx.resumePoint OF
+      | 0: (* Phase 0 *) DoInitialization; Yield(ctx)
+      | 1: (* Phase 1 *) DoWork; IF moreWork THEN YieldAt(ctx, 1) ELSE Yield(ctx) END  
+      | 2: (* Phase 2 *) DoCleanup (* No yield = finished *)
+      END
+    END MyTask;
+    
+    Copyright (C) 2025
+    Released under The 3-Clause BSD License.
+    Author: Artemis Project
+*)</span>
+DEFINITION <em>Task</em>;
+
+IMPORT Collections;
+
+TYPE
+    <span class='comment'>(* Base context for all tasks - extend this for task-specific data *)</span>
+    TaskContext = POINTER TO TaskContextDesc;
+    TaskContextDesc = RECORD (Collections.Item)
+        resumePoint: INTEGER <span class='comment'>(* Current resume point for stackless coroutines *)</span>
+    END;
+
+    <span class='comment'>(* Task procedure signature - receives context as parameter *)</span>
+    TaskProc = PROCEDURE (ctx : TaskContext);
+
+    <span class='comment'>(* Cooperative task scheduler *)</span>
+    Scheduler = POINTER TO SchedulerDesc;
+
+    <span class='comment'>(* Buffered communication channel *)</span>
+    Channel = POINTER TO ChannelDesc;
+
+<span class='comment'>(* Create a new cooperative task scheduler *)</span>
+PROCEDURE <em>NewScheduler</em>(): Scheduler;
+
+<span class='comment'>(* Add a task to the scheduler with its context *)</span>
+PROCEDURE <em>AddTask</em>(sched: Scheduler; proc: TaskProc; ctx : TaskContext);
+
+<span class='comment'>(* Yield control to next task and auto-increment resume point *)</span>
+PROCEDURE <em>Yield</em>(ctx: TaskContext);
+
+<span class='comment'>(* Yield control and set specific resume point for loops/branches *)</span>
+PROCEDURE <em>YieldAt</em>(ctx: TaskContext; point: INTEGER);
+
+<span class='comment'>(* Run scheduler in round-robin fashion until all tasks complete *)</span>
+PROCEDURE <em>Run</em>(sched: Scheduler);
+
+<span class='comment'>(* Create a buffered channel for message passing between tasks *)</span>
+PROCEDURE <em>NewChannel</em>(capacity: INTEGER): Channel;
+
+<span class='comment'>(* Send message to channel - returns FALSE if buffer is full *)</span>
+PROCEDURE <em>Send</em>(ch: Channel; msg: Collections.ItemPtr): BOOLEAN;
+
+<span class='comment'>(* Receive message from channel - returns FALSE if buffer is empty *)</span>
+PROCEDURE <em>Receive</em>(ch: Channel; VAR msg: Collections.ItemPtr): BOOLEAN;
+
+END Task.
+</pre>
+	</body>
+</html>

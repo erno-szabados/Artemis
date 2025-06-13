@@ -1,0 +1,20 @@
+(*
+    TaskTest.Mod - Minimal tests for Task cooperative scheduler and channels
+    
+    Copyright (C) 2025
+    Released under The 3-Clause BSD License.
+*)
+DEFINITION TaskTest;
+
+IMPORT Collections;
+
+TYPE
+    (* Wrapper for INTEGER - a Collections.Item *)
+    IntegerWrapper = RECORD(Collections.Item)
+        value: INTEGER
+    END;
+    IntegerWrapperPtr = POINTER TO IntegerWrapper;
+
+VAR ts: Tests.TestSet;
+(* Create a new INTEGER wrapper *)
+END TaskTest.
