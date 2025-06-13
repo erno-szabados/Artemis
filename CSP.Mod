@@ -30,7 +30,10 @@ TYPE
         capacity: INTEGER;
         state: INTEGER;
         sendWaiters: Queue.Queue;
-        recvWaiters: Queue.Queue
+        recvWaiters: Queue.Queue;
+        mutex: artPThread.Mutex;
+        sendCond: artPThread.CondVar;
+        recvCond: artPThread.CondVar
     END;
     
     (** Process procedure type *)
@@ -86,6 +89,9 @@ BEGIN
     ch.state := OPEN;
     ch.sendWaiters := Queue.New();
     ch.recvWaiters := Queue.New();
+    ch.mutex := artPThread.NewMutex();
+    ch.sendCond := artPThread.NewCondVar();
+    ch.recvCond := artPThread.NewCondVar();
     RETURN ch
 END NewChannel;
 
@@ -102,6 +108,15 @@ BEGIN
         END;
         IF ch.recvWaiters # NIL THEN
             Queue.Clear(ch.recvWaiters)
+        END;
+        IF ch.mutex # NIL THEN
+            artPThread.FreeMutex(ch.mutex)
+        END;
+        IF ch.sendCond # NIL THEN
+            artPThread.FreeCondVar(ch.sendCond)
+        END;
+        IF ch.recvCond # NIL THEN
+            artPThread.FreeCondVar(ch.recvCond)
         END;
         ch := NIL
     END
@@ -191,18 +206,53 @@ END TryReceive;
 
 (** Blocking send (simplified - would need scheduler integration) *)
 PROCEDURE Send*(ch: Channel; item: Collections.ItemPtr);
-VAR success: BOOLEAN;
+VAR success, done, ok: BOOLEAN;
 BEGIN
-    success := TrySend(ch, item);
-    (* In full implementation, would block here if not successful *)
+    done := FALSE;
+    IF (ch = NIL) OR (ch.state # OPEN) THEN
+        done := TRUE
+    END;
+    WHILE ~done DO
+        IF artPThread.Lock(ch.mutex) THEN
+            success := TrySend(ch, item);
+            IF success THEN
+                ok := artPThread.Signal(ch.recvCond);
+                ok := artPThread.Unlock(ch.mutex);
+                done := TRUE
+            ELSE
+                ok := artPThread.Wait(ch.sendCond, ch.mutex);
+                ok := artPThread.Unlock(ch.mutex)
+            END
+        END
+    END
 END Send;
 
 (** Blocking receive (simplified - would need scheduler integration) *)
 PROCEDURE Receive*(ch: Channel; VAR item: Collections.ItemPtr);
-VAR success: BOOLEAN;
+VAR success, done, ok: BOOLEAN;
 BEGIN
-    success := TryReceive(ch, item);
-    (* In full implementation, would block here if not successful *)
+    done := FALSE;
+    IF ch = NIL THEN
+        item := NIL;
+        done := TRUE
+    END;
+    WHILE ~done DO
+        IF artPThread.Lock(ch.mutex) THEN
+            success := TryReceive(ch, item);
+            IF success THEN
+                ok := artPThread.Signal(ch.sendCond);
+                ok := artPThread.Unlock(ch.mutex);
+                done := TRUE
+            ELSIF ch.state = CLOSED THEN
+                ok := artPThread.Unlock(ch.mutex);
+                item := NIL;
+                done := TRUE
+            ELSE
+                ok := artPThread.Wait(ch.recvCond, ch.mutex);
+                ok := artPThread.Unlock(ch.mutex)
+            END
+        END
+    END
 END Receive;
 
 (** Create a new process *)
