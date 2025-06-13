@@ -101,11 +101,12 @@ END TestThreadCreation;
 PROCEDURE SimpleThread();
 BEGIN
     (* Simple thread that just returns *)
+    artPThread.Sleep(1000);
 END SimpleThread;
 
 PROCEDURE TestThreadOperations*(): BOOLEAN;
 VAR
-    thread: CSPThreads.Thread;
+    thread, thread2: CSPThreads.Thread;
     ok, pass: BOOLEAN;
 BEGIN
     pass := TRUE;
@@ -113,11 +114,18 @@ BEGIN
     (* Test thread creation *)
     thread := CSPThreads.NewThread(SimpleThread);
     Tests.ExpectedBool(thread # NIL, TRUE, "Should create thread", pass);
+
+    thread2 := CSPThreads.NewThread(SimpleThread);
+    Tests.ExpectedBool(thread2 # NIL, TRUE, "Should create thread", pass);
     
     (* Test thread join *)
     ok := CSPThreads.JoinThread(thread);
     Tests.ExpectedBool(TRUE, ok, "Should join thread successfully", pass);
     
+    (* Test thread join *)
+    ok := CSPThreads.JoinThread(thread2);
+    Tests.ExpectedBool(TRUE, ok, "Should join thread2 successfully", pass);
+
     (* Test join on NIL thread *)
     ok := CSPThreads.JoinThread(NIL);
     Tests.ExpectedBool(FALSE, ok, "JoinThread should fail on NIL thread", pass);
