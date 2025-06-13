@@ -6,7 +6,7 @@
 *)
 MODULE CSPTest;
 
-IMPORT CSP, Collections, Tests;
+IMPORT CSP, Collections, Tests, artPThread;
 
 TYPE
     TestMessage = RECORD (Collections.Item)
@@ -208,6 +208,27 @@ BEGIN
     RETURN pass
 END TestChannelDestruction;
 
+PROCEDURE JoinableProcess();
+BEGIN
+    (* Simulate work *)
+    artPThread.Sleep(100)
+END JoinableProcess;
+
+PROCEDURE TestProcessJoin*(): BOOLEAN;
+VAR
+    proc: CSP.Process;
+    ok, pass: BOOLEAN;
+BEGIN
+    pass := TRUE;
+    proc := CSP.NewProcess(JoinableProcess);
+    ok := CSP.JoinProcess(proc);
+    Tests.ExpectedBool(TRUE, ok, "JoinProcess should succeed", pass);
+    (* Second join should fail (already joined) *)
+    ok := CSP.JoinProcess(proc);
+    Tests.ExpectedBool(FALSE, ok, "JoinProcess should fail on already joined process", pass);
+    RETURN pass
+END TestProcessJoin;
+
 BEGIN
     Tests.Init(ts, "CSP");
     Tests.Add(ts, TestChannelCreation);
@@ -217,5 +238,6 @@ BEGIN
     Tests.Add(ts, TestProcessExecution);
     Tests.Add(ts, TestClosedChannel);
     Tests.Add(ts, TestChannelDestruction);
+    Tests.Add(ts, TestProcessJoin);
     ASSERT(Tests.Run(ts));
 END CSPTest.

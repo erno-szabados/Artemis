@@ -397,6 +397,33 @@ BEGIN
     Out.Ln
 END DemonstrateTrueConcurrency;
 
+(* Demonstrate joining a CSP process (waiting for completion) *)
+PROCEDURE JoinableExampleProcess();
+VAR i: INTEGER;
+BEGIN
+    Out.String("[JoinableProcess] Working..."); Out.Ln;
+    FOR i := 1 TO 3 DO
+        Out.String("[JoinableProcess] Step "); Out.Int(i, 0); Out.Ln;
+        artPThread.Sleep(100)
+    END;
+    Out.String("[JoinableProcess] Done!"); Out.Ln
+END JoinableExampleProcess;
+
+PROCEDURE DemonstrateProcessJoin*();
+VAR proc: CSP.Process; ok: BOOLEAN;
+BEGIN
+    Out.String("=== Process Join Demo ==="); Out.Ln;
+    proc := CSP.NewProcess(JoinableExampleProcess);
+    Out.String("Started joinable process (thread)"); Out.Ln;
+    ok := CSP.JoinProcess(proc);
+    IF ok THEN
+        Out.String("Main: Successfully joined process.")
+    ELSE
+        Out.String("Main: Failed to join process!")
+    END;
+    Out.Ln; Out.Ln
+END DemonstrateProcessJoin;
+
 (** Main demonstration *)
 PROCEDURE Run*();
 BEGIN
@@ -410,6 +437,7 @@ BEGIN
     DemonstrateProcesses();
     DemonstrateMultipleProcesses();
     DemonstrateTrueConcurrency();
+    DemonstrateProcessJoin();
     
     Out.String("CSP Examples Complete!"); Out.Ln
 END Run;

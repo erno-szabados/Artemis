@@ -298,6 +298,20 @@ BEGIN
     END
 END AddProcess;
 
+(** Wait for a process to finish. Returns TRUE if successful, FALSE otherwise. *)
+PROCEDURE JoinProcess*(proc: Process): BOOLEAN;
+VAR ok: BOOLEAN;
+BEGIN
+    ok := FALSE;
+    IF (proc # NIL) & (proc.thread # NIL) THEN
+        ok := artPThread.Join(proc.thread);
+        IF ok THEN
+            proc.thread := NIL
+        END
+    END;
+    RETURN ok
+END JoinProcess;
+
 (** Simple cooperative yield *)
 PROCEDURE Yield*();
 BEGIN
