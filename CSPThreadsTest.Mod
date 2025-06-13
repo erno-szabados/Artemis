@@ -87,39 +87,43 @@ BEGIN
     RETURN pass
 END TestSynchronousChannel;
 
-PROCEDURE TestProcessCreation*(): BOOLEAN;
+PROCEDURE TestThreadCreation*(): BOOLEAN;
 VAR 
-    proc: CSPThreads.Process;
-    sched: CSPThreads.Scheduler;
+    thread: CSPThreads.Thread;
     pass: BOOLEAN;
 BEGIN
     pass := TRUE;
-    proc := CSPThreads.NewProcess(NIL);
-    Tests.ExpectedBool(proc # NIL, TRUE, "Should create process", pass);
-    sched := CSPThreads.NewScheduler();
-    Tests.ExpectedBool(sched # NIL, TRUE, "Should create scheduler", pass);
-    CSPThreads.AddProcess(sched, proc);
+    thread := CSPThreads.NewThread(NIL);
+    Tests.ExpectedBool(thread # NIL, TRUE, "Should create thread", pass);
     RETURN pass
-END TestProcessCreation;
+END TestThreadCreation;
 
-PROCEDURE SimpleProcess();
+PROCEDURE SimpleThread();
 BEGIN
-END SimpleProcess;
+    (* Simple thread that just returns *)
+END SimpleThread;
 
-PROCEDURE TestProcessExecution*(): BOOLEAN;
-VAR 
-    proc: CSPThreads.Process;
-    sched: CSPThreads.Scheduler;
-    pass: BOOLEAN;
+PROCEDURE TestThreadOperations*(): BOOLEAN;
+VAR
+    thread: CSPThreads.Thread;
+    ok, pass: BOOLEAN;
 BEGIN
     pass := TRUE;
-    sched := CSPThreads.NewScheduler();
-    proc := CSPThreads.NewProcess(SimpleProcess);
-    CSPThreads.AddProcess(sched, proc);
-    CSPThreads.Run(sched);
-    Tests.ExpectedBool(TRUE, TRUE, "Process execution completed", pass);
+    
+    (* Test thread creation *)
+    thread := CSPThreads.NewThread(SimpleThread);
+    Tests.ExpectedBool(thread # NIL, TRUE, "Should create thread", pass);
+    
+    (* Test thread join *)
+    ok := CSPThreads.JoinThread(thread);
+    Tests.ExpectedBool(TRUE, ok, "Should join thread successfully", pass);
+    
+    (* Test join on NIL thread *)
+    ok := CSPThreads.JoinThread(NIL);
+    Tests.ExpectedBool(FALSE, ok, "JoinThread should fail on NIL thread", pass);
+    
     RETURN pass
-END TestProcessExecution;
+END TestThreadOperations;
 
 PROCEDURE TestClosedChannel*(): BOOLEAN;
 VAR 
@@ -156,34 +160,14 @@ BEGIN
     RETURN pass
 END TestChannelDestruction;
 
-PROCEDURE JoinableProcess();
-BEGIN
-    artPThread.Sleep(100)
-END JoinableProcess;
-
-PROCEDURE TestProcessJoin*(): BOOLEAN;
-VAR
-    proc: CSPThreads.Process;
-    ok, pass: BOOLEAN;
-BEGIN
-    pass := TRUE;
-    proc := CSPThreads.NewProcess(JoinableProcess);
-    ok := CSPThreads.JoinProcess(proc);
-    Tests.ExpectedBool(TRUE, ok, "JoinProcess should succeed", pass);
-    ok := CSPThreads.JoinProcess(proc);
-    Tests.ExpectedBool(FALSE, ok, "JoinProcess should fail on already joined process", pass);
-    RETURN pass
-END TestProcessJoin;
-
 BEGIN
     Tests.Init(ts, "CSPThreads Tests");
     Tests.Add(ts, TestChannelCreation);
     Tests.Add(ts, TestNonBlockingOperations);
     Tests.Add(ts, TestSynchronousChannel);
-    Tests.Add(ts, TestProcessCreation);
-    Tests.Add(ts, TestProcessExecution);
+    Tests.Add(ts, TestThreadCreation);
+    Tests.Add(ts, TestThreadOperations);
     Tests.Add(ts, TestClosedChannel);
     Tests.Add(ts, TestChannelDestruction);
-    Tests.Add(ts, TestProcessJoin);
     ASSERT(Tests.Run(ts));
 END CSPThreadsTest.
