@@ -9,7 +9,7 @@
 *)
 MODULE CSP;
 
-IMPORT Collections, Queue;
+IMPORT Collections, Queue, artPThread, SYSTEM;
 
 CONST
     (** Channel states *)
@@ -41,7 +41,8 @@ TYPE
     ProcessDesc = RECORD (Collections.Item)
         id: INTEGER;
         state: INTEGER;
-        proc: ProcessProc
+        proc: ProcessProc;
+        thread: artPThread.Thread
     END;
     
     (** Waiter for blocking operations *)
@@ -64,6 +65,17 @@ TYPE
 VAR
     defaultScheduler: Scheduler;
 
+(* Trampoline for process threads *)
+PROCEDURE ProcessTrampoline(context: INTEGER): INTEGER;
+VAR proc: ProcessProc;
+BEGIN
+    proc := SYSTEM.VAL(ProcessProc, context);
+    IF proc # NIL THEN
+        proc()
+    END;
+    RETURN 0
+END ProcessTrampoline;
+
 (** Create a new channel with given capacity (0 = synchronous) *)
 PROCEDURE NewChannel*(capacity: INTEGER): Channel;
 VAR ch: Channel;
@@ -76,6 +88,24 @@ BEGIN
     ch.recvWaiters := Queue.New();
     RETURN ch
 END NewChannel;
+
+(** Free a channel and its resources *)
+PROCEDURE FreeChannel*(VAR ch: Channel);
+BEGIN
+    IF ch # NIL THEN
+        ch.state := CLOSED;
+        IF ch.buffer # NIL THEN
+            Queue.Clear(ch.buffer)
+        END;
+        IF ch.sendWaiters # NIL THEN
+            Queue.Clear(ch.sendWaiters)
+        END;
+        IF ch.recvWaiters # NIL THEN
+            Queue.Clear(ch.recvWaiters)
+        END;
+        ch := NIL
+    END
+END FreeChannel;
 
 (** Close a channel (no more sends allowed) *)
 PROCEDURE CloseChannel*(ch: Channel);
@@ -182,11 +212,15 @@ BEGIN
     NEW(p);
     p.proc := proc;
     p.state := READY;
+    p.thread := NIL;
     IF defaultScheduler # NIL THEN
         p.id := defaultScheduler.nextId;
         INC(defaultScheduler.nextId)
     ELSE
         p.id := 0
+    END;
+    IF proc # NIL THEN
+        p.thread := artPThread.NewThread(ProcessTrampoline, SYSTEM.VAL(INTEGER, proc))
     END;
     RETURN p
 END NewProcess;

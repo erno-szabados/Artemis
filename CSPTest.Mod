@@ -197,6 +197,17 @@ BEGIN
     RETURN pass
 END TestClosedChannel;
 
+PROCEDURE TestChannelDestruction*(): BOOLEAN;
+VAR ch: CSP.Channel; pass: BOOLEAN;
+BEGIN
+    pass := TRUE;
+    ch := CSP.NewChannel(2);
+    Tests.ExpectedBool(FALSE, ch = NIL, "Channel should be created", pass);
+    CSP.FreeChannel(ch);
+    Tests.ExpectedBool(TRUE, ch = NIL, "Channel should be NIL after FreeChannel", pass);
+    RETURN pass
+END TestChannelDestruction;
+
 BEGIN
     Tests.Init(ts, "CSP");
     Tests.Add(ts, TestChannelCreation);
@@ -205,5 +216,6 @@ BEGIN
     Tests.Add(ts, TestProcessCreation);
     Tests.Add(ts, TestProcessExecution);
     Tests.Add(ts, TestClosedChannel);
+    Tests.Add(ts, TestChannelDestruction);
     ASSERT(Tests.Run(ts));
 END CSPTest.

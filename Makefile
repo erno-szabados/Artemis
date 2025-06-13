@@ -13,9 +13,9 @@ MODULES = $(shell ls -1 *.Mod)
 DOCS= codemeta.json CITATION.cff README.md LICENSE INSTALL.txt
 HTML_FILES=$(shell find . -type f | grep -E '.html')
 
-OC = env OBNC_IMPORT_PATH=".:obnc:../obnc" obnc
+OC = env OBNC_IMPORT_PATH=".:obnc:./obnc:../obnc" obnc
 # Defaults
-OC = obnc
+#OC = obnc
 OS = $(shell uname)
 ARCH = $(shell uname -m)
 PREFIX = /usr/local
