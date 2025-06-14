@@ -43,7 +43,7 @@ PROCEDURE Free(VAR ch: SyncChannel);
 PROCEDURE Close(ch: SyncChannel);
 
 (* Create a new synchronous channel for rendezvous communication *)
-PROCEDURE New(): SyncChannel;
+PROCEDURE NewChannel(): SyncChannel;
 
 (* Check if synchronous channel is closed *)
 PROCEDURE IsClosed(ch: SyncChannel): BOOLEAN;

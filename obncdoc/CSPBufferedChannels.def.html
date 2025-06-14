@@ -46,10 +46,15 @@ TYPE
 <span class='comment'>(* Free buffered channel resources - call when done with channel *)</span>
 PROCEDURE <em>Free</em>(VAR ch: BufferedChannel);
 
-<span class='comment'>(* Create a new thread-safe buffered channel with specified buffer capacity *)</span>
-PROCEDURE <em>New</em>(capacity: INTEGER): BufferedChannel;
+<span class='comment'>(* Create a new thread-safe buffered channel with specified buffer capacity
+    Note: 0 capacity buffered channels are not allowed because they would break 
+    CSP semantics. Use a CSPSyncChannel instead.
+ *)</span>
+PROCEDURE <em>NewChannel</em>(capacity: INTEGER): BufferedChannel;
 
-<span class='comment'>(* Close a buffered channel - no more sends allowed, receives drain remaining messages *)</span>
+<span class='comment'>(* Close a buffered channel - no more sends allowed, receives drain remaining messages 
+  If Unlock fails, the error is ignored, as Close does not return a result.  
+ *)</span>
 PROCEDURE <em>Close</em>(ch: BufferedChannel);
 
 <span class='comment'>(* Check if buffered channel is closed *)</span>

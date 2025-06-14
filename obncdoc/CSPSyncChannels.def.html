@@ -55,7 +55,7 @@ PROCEDURE <em>Free</em>(VAR ch: SyncChannel);
 PROCEDURE <em>Close</em>(ch: SyncChannel);
 
 <span class='comment'>(* Create a new synchronous channel for rendezvous communication *)</span>
-PROCEDURE <em>New</em>(): SyncChannel;
+PROCEDURE <em>NewChannel</em>(): SyncChannel;
 
 <span class='comment'>(* Check if synchronous channel is closed *)</span>
 PROCEDURE <em>IsClosed</em>(ch: SyncChannel): BOOLEAN;
