@@ -1,0 +1,73 @@
+<!DOCTYPE html PUBLIC '-//W3C//DTD XHTML 1.0 Strict//EN' 'http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd'>
+<html xmlns='http://www.w3.org/1999/xhtml' xml:lang='en' lang='en'>
+	<head>
+		<meta name='viewport' content='width=device-width, initial-scale=1.0' />
+		<meta http-equiv='Content-Type' content='text/html; charset=utf-8' />
+		<title>DEFINITION CSPBufferedChannels</title>
+		<link rel='stylesheet' type='text/css' href='style.css' />
+	</head>
+	<body>
+		<p><a href='index.html'>Index</a></p>
+
+		<pre>
+<span class='comment'>(*
+    CSPBufferedChannels.Mod - Thread-safe channels for CSP-style communication
+    
+    Provides:
+    - Thread-safe buffered channels with blocking/non-blocking operations
+    - Clean CSP-style communication primitives
+    
+    This module implements two distinct channel types:
+    
+    BUFFERED CHANNELS:
+    - Fixed-capacity buffer with FIFO semantics
+    - Non-blocking operations (TrySend/TryReceive) for immediate checks
+    - Blocking operations (Send/Receive) for guaranteed delivery
+    - Graceful closure with buffer draining
+ 
+    Channels are intended to be thread-safe.
+    
+    Copyright (C) 2025
+    Released under The 3-Clause BSD License.
+    Author: Artemis Project
+*)</span>
+DEFINITION <em>CSPBufferedChannels</em>;
+
+IMPORT Collections;
+
+CONST
+    OPEN = 0;
+    CLOSED = 1;
+
+TYPE
+    <span class='comment'>(* Thread-safe buffered channel for message passing between threads *)</span>
+    BufferedChannel = POINTER TO BufferedChannelDesc;
+
+<span class='comment'>(* Free buffered channel resources - call when done with channel *)</span>
+PROCEDURE <em>Free</em>(VAR ch: BufferedChannel);
+
+<span class='comment'>(* Create a new thread-safe buffered channel with specified buffer capacity *)</span>
+PROCEDURE <em>New</em>(capacity: INTEGER): BufferedChannel;
+
+<span class='comment'>(* Close a buffered channel - no more sends allowed, receives drain remaining messages *)</span>
+PROCEDURE <em>Close</em>(ch: BufferedChannel);
+
+<span class='comment'>(* Check if buffered channel is closed *)</span>
+PROCEDURE <em>IsClosed</em>(ch: BufferedChannel): BOOLEAN;
+
+<span class='comment'>(* Non-blocking send - returns TRUE if message was sent, FALSE if buffer full or error *)</span>
+PROCEDURE <em>TrySend</em>(ch: BufferedChannel; item: Collections.ItemPtr): BOOLEAN;
+
+<span class='comment'>(* Non-blocking receive - returns TRUE if message received, FALSE if buffer empty or error *)</span>
+PROCEDURE <em>TryReceive</em>(ch: BufferedChannel; VAR item: Collections.ItemPtr): BOOLEAN;
+
+<span class='comment'>(* Blocking send - waits until message can be sent or buffered channel is closed *)</span>
+PROCEDURE <em>Send</em>(ch: BufferedChannel; item: Collections.ItemPtr);
+
+<span class='comment'>(* Blocking receive - waits until message available or buffered channel closed and empty *)</span>
+PROCEDURE <em>Receive</em>(ch: BufferedChannel; VAR item: Collections.ItemPtr);
+
+END CSPBufferedChannels.
+</pre>
+	</body>
+</html>

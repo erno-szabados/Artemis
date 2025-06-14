@@ -3,7 +3,7 @@
 	<head>
 		<meta name='viewport' content='width=device-width, initial-scale=1.0' />
 		<meta http-equiv='Content-Type' content='text/html; charset=utf-8' />
-		<title>DEFINITION CSPChannelsTest</title>
+		<title>DEFINITION CSPBufferedChannelsTest</title>
 		<link rel='stylesheet' type='text/css' href='style.css' />
 	</head>
 	<body>
@@ -11,19 +11,18 @@
 
 		<pre>
 <span class='comment'>(*
-    CSPChannelsTest.Mod - Test suite for CSPChannels module
+    CSPBufferedChannelsTest.Mod - Test suite for CSPBufferedChannels module
     
-    Tests both buffered and synchronous channel functionality including:
+    Tests both buffered  channel functionality including:
     - Channel creation and resource management
     - Blocking and non-blocking operations
     - Channel closure behavior
-    - Synchronous rendezvous semantics
     
     Copyright (C) 2025
     Released under The 3-Clause BSD License.
     Author: Artemis Project
 *)</span>
-DEFINITION <em>CSPChannelsTest</em>;
+DEFINITION <em>CSPBufferedChannelsTest</em>;
 
 PROCEDURE <em>TestBufferedChannelCreation</em>(): BOOLEAN;
 
@@ -33,11 +32,7 @@ PROCEDURE <em>TestBufferedChannelMemoryManagement</em>(): BOOLEAN;
 
 PROCEDURE <em>TestClosedBufferedChannel</em>(): BOOLEAN;
 
-PROCEDURE <em>TestSyncChannelCreation</em>(): BOOLEAN;
-
-PROCEDURE <em>TestSyncChannelNonBlocking</em>(): BOOLEAN;
-
-END CSPChannelsTest.
+END CSPBufferedChannelsTest.
 </pre>
 	</body>
 </html>

@@ -1,0 +1,63 @@
+(*
+    CSPSyncChannels.Mod - Thread-safe channels for CSP-style communication
+    
+    Provides:
+    - Thread-safe synchronous channels for rendezvous communication
+    - Clean CSP-style communication primitives
+    
+    This module implements SYNCHRONOUS CHANNELS:
+    - True CSP rendezvous semantics
+    - Direct sender-to-receiver handoff with no buffering
+    - Both parties must be ready simultaneously
+    - Ideal for tightly coordinated communication patterns
+    
+    Channels are intended to be thread-safe.
+    
+    Copyright (C) 2025
+    Released under The 3-Clause BSD License.
+    Author: Artemis Project
+*)
+DEFINITION CSPSyncChannels;
+
+IMPORT Collections;
+
+CONST
+    OPEN = 0;
+    CLOSED = 1;
+
+TYPE
+    (* Thread-safe synchronous channel for rendezvous communication *)
+    SyncChannel = POINTER TO SyncChannelDesc;
+
+(* 
+   Synchronous Channel Operations
+   
+   True CSP-style synchronous communication with rendezvous semantics.
+   Sender and receiver block until both are ready, then handoff occurs directly.
+ *)
+
+(* Free synchronous channel resources *)
+PROCEDURE Free(VAR ch: SyncChannel);
+
+(* Close a synchronous channel - no more operations allowed *)
+PROCEDURE Close(ch: SyncChannel);
+
+(* Create a new synchronous channel for rendezvous communication *)
+PROCEDURE New(): SyncChannel;
+
+(* Check if synchronous channel is closed *)
+PROCEDURE IsClosed(ch: SyncChannel): BOOLEAN;
+
+(* Non-blocking synchronous send - returns TRUE only if receiver ready *)
+PROCEDURE TrySend(ch: SyncChannel; item: Collections.ItemPtr): BOOLEAN;
+
+(* Non-blocking synchronous receive - returns TRUE only if sender ready *)
+PROCEDURE TryReceive(ch: SyncChannel; VAR item: Collections.ItemPtr): BOOLEAN;
+
+(* Blocking synchronous send - waits for receiver rendezvous *)
+PROCEDURE Send(ch: SyncChannel; item: Collections.ItemPtr);
+
+(* Blocking synchronous receive - waits for sender rendezvous *)
+PROCEDURE Receive(ch: SyncChannel; VAR item: Collections.ItemPtr);
+
+END CSPSyncChannels.

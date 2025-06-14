@@ -1,17 +1,16 @@
 (*
-    CSPChannelsTest.Mod - Test suite for CSPChannels module
+    CSPBufferedChannelsTest.Mod - Test suite for CSPBufferedChannels module
     
-    Tests both buffered and synchronous channel functionality including:
+    Tests both buffered  channel functionality including:
     - Channel creation and resource management
     - Blocking and non-blocking operations
     - Channel closure behavior
-    - Synchronous rendezvous semantics
     
     Copyright (C) 2025
     Released under The 3-Clause BSD License.
     Author: Artemis Project
 *)
-DEFINITION CSPChannelsTest;
+DEFINITION CSPBufferedChannelsTest;
 
 PROCEDURE TestBufferedChannelCreation(): BOOLEAN;
 
@@ -21,8 +20,4 @@ PROCEDURE TestBufferedChannelMemoryManagement(): BOOLEAN;
 
 PROCEDURE TestClosedBufferedChannel(): BOOLEAN;
 
-PROCEDURE TestSyncChannelCreation(): BOOLEAN;
-
-PROCEDURE TestSyncChannelNonBlocking(): BOOLEAN;
-
-END CSPChannelsTest.
+END CSPBufferedChannelsTest.

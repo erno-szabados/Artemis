@@ -1,0 +1,78 @@
+<!DOCTYPE html PUBLIC '-//W3C//DTD XHTML 1.0 Strict//EN' 'http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd'>
+<html xmlns='http://www.w3.org/1999/xhtml' xml:lang='en' lang='en'>
+	<head>
+		<meta name='viewport' content='width=device-width, initial-scale=1.0' />
+		<meta http-equiv='Content-Type' content='text/html; charset=utf-8' />
+		<title>DEFINITION CSPSyncChannels</title>
+		<link rel='stylesheet' type='text/css' href='style.css' />
+	</head>
+	<body>
+		<p><a href='index.html'>Index</a></p>
+
+		<pre>
+<span class='comment'>(*
+    CSPSyncChannels.Mod - Thread-safe channels for CSP-style communication
+    
+    Provides:
+    - Thread-safe synchronous channels for rendezvous communication
+    - Clean CSP-style communication primitives
+    
+    This module implements SYNCHRONOUS CHANNELS:
+    - True CSP rendezvous semantics
+    - Direct sender-to-receiver handoff with no buffering
+    - Both parties must be ready simultaneously
+    - Ideal for tightly coordinated communication patterns
+    
+    Channels are intended to be thread-safe.
+    
+    Copyright (C) 2025
+    Released under The 3-Clause BSD License.
+    Author: Artemis Project
+*)</span>
+DEFINITION <em>CSPSyncChannels</em>;
+
+IMPORT Collections;
+
+CONST
+    OPEN = 0;
+    CLOSED = 1;
+
+TYPE
+    <span class='comment'>(* Thread-safe synchronous channel for rendezvous communication *)</span>
+    SyncChannel = POINTER TO SyncChannelDesc;
+
+<span class='comment'>(* 
+   Synchronous Channel Operations
+   
+   True CSP-style synchronous communication with rendezvous semantics.
+   Sender and receiver block until both are ready, then handoff occurs directly.
+ *)</span>
+
+<span class='comment'>(* Free synchronous channel resources *)</span>
+PROCEDURE <em>Free</em>(VAR ch: SyncChannel);
+
+<span class='comment'>(* Close a synchronous channel - no more operations allowed *)</span>
+PROCEDURE <em>Close</em>(ch: SyncChannel);
+
+<span class='comment'>(* Create a new synchronous channel for rendezvous communication *)</span>
+PROCEDURE <em>New</em>(): SyncChannel;
+
+<span class='comment'>(* Check if synchronous channel is closed *)</span>
+PROCEDURE <em>IsClosed</em>(ch: SyncChannel): BOOLEAN;
+
+<span class='comment'>(* Non-blocking synchronous send - returns TRUE only if receiver ready *)</span>
+PROCEDURE <em>TrySend</em>(ch: SyncChannel; item: Collections.ItemPtr): BOOLEAN;
+
+<span class='comment'>(* Non-blocking synchronous receive - returns TRUE only if sender ready *)</span>
+PROCEDURE <em>TryReceive</em>(ch: SyncChannel; VAR item: Collections.ItemPtr): BOOLEAN;
+
+<span class='comment'>(* Blocking synchronous send - waits for receiver rendezvous *)</span>
+PROCEDURE <em>Send</em>(ch: SyncChannel; item: Collections.ItemPtr);
+
+<span class='comment'>(* Blocking synchronous receive - waits for sender rendezvous *)</span>
+PROCEDURE <em>Receive</em>(ch: SyncChannel; VAR item: Collections.ItemPtr);
+
+END CSPSyncChannels.
+</pre>
+	</body>
+</html>

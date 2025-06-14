@@ -1,0 +1,58 @@
+(*
+    CSPBufferedChannels.Mod - Thread-safe channels for CSP-style communication
+    
+    Provides:
+    - Thread-safe buffered channels with blocking/non-blocking operations
+    - Clean CSP-style communication primitives
+    
+    This module implements two distinct channel types:
+    
+    BUFFERED CHANNELS:
+    - Fixed-capacity buffer with FIFO semantics
+    - Non-blocking operations (TrySend/TryReceive) for immediate checks
+    - Blocking operations (Send/Receive) for guaranteed delivery
+    - Graceful closure with buffer draining
+ 
+    Channels are intended to be thread-safe.
+    
+    Copyright (C) 2025
+    Released under The 3-Clause BSD License.
+    Author: Artemis Project
+*)
+DEFINITION CSPBufferedChannels;
+
+IMPORT Collections;
+
+CONST
+    OPEN = 0;
+    CLOSED = 1;
+
+TYPE
+    (* Thread-safe buffered channel for message passing between threads *)
+    BufferedChannel = POINTER TO BufferedChannelDesc;
+
+(* Free buffered channel resources - call when done with channel *)
+PROCEDURE Free(VAR ch: BufferedChannel);
+
+(* Create a new thread-safe buffered channel with specified buffer capacity *)
+PROCEDURE New(capacity: INTEGER): BufferedChannel;
+
+(* Close a buffered channel - no more sends allowed, receives drain remaining messages *)
+PROCEDURE Close(ch: BufferedChannel);
+
+(* Check if buffered channel is closed *)
+PROCEDURE IsClosed(ch: BufferedChannel): BOOLEAN;
+
+(* Non-blocking send - returns TRUE if message was sent, FALSE if buffer full or error *)
+PROCEDURE TrySend(ch: BufferedChannel; item: Collections.ItemPtr): BOOLEAN;
+
+(* Non-blocking receive - returns TRUE if message received, FALSE if buffer empty or error *)
+PROCEDURE TryReceive(ch: BufferedChannel; VAR item: Collections.ItemPtr): BOOLEAN;
+
+(* Blocking send - waits until message can be sent or buffered channel is closed *)
+PROCEDURE Send(ch: BufferedChannel; item: Collections.ItemPtr);
+
+(* Blocking receive - waits until message available or buffered channel closed and empty *)
+PROCEDURE Receive(ch: BufferedChannel; VAR item: Collections.ItemPtr);
+
+END CSPBufferedChannels.
