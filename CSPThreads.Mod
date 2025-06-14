@@ -100,13 +100,17 @@ END IsClosed;
 
 (** Non-blocking send - returns TRUE if message was sent, FALSE if buffer full *)
 PROCEDURE TrySend*(ch: Channel; item: Collections.ItemPtr): BOOLEAN;
-VAR result: BOOLEAN;
+VAR result, ok: BOOLEAN;
 BEGIN
     result := FALSE;
-    IF (ch # NIL) & (ch.state = OPEN) THEN
-        IF Queue.Count(ch.buffer) < ch.capacity THEN
-            Queue.Enqueue(ch.buffer, item);
-            result := TRUE
+    IF ch # NIL THEN
+        IF artPThread.TryLock(ch.mutex) THEN
+            IF (ch.state = OPEN) & (Queue.Count(ch.buffer) < ch.capacity) THEN
+                Queue.Enqueue(ch.buffer, item);
+                ok := artPThread.Signal(ch.recvCond);
+                result := TRUE
+            END;
+            ok := artPThread.Unlock(ch.mutex)
         END
     END;
     RETURN result
@@ -114,14 +118,18 @@ END TrySend;
 
 (** Non-blocking receive - returns TRUE if message received, FALSE if buffer empty *)
 PROCEDURE TryReceive*(ch: Channel; VAR item: Collections.ItemPtr): BOOLEAN;
-VAR result: BOOLEAN;
+VAR result, ok: BOOLEAN;
 BEGIN
     result := FALSE;
     item := NIL;
     IF ch # NIL THEN
-        IF Queue.Count(ch.buffer) > 0 THEN
-            Queue.Dequeue(ch.buffer, item);
-            result := TRUE
+        IF artPThread.TryLock(ch.mutex) THEN
+            IF Queue.Count(ch.buffer) > 0 THEN
+                Queue.Dequeue(ch.buffer, item);
+                ok := artPThread.Signal(ch.sendCond);
+                result := TRUE
+            END;
+            ok := artPThread.Unlock(ch.mutex)
         END
     END;
     RETURN result
