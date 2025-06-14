@@ -274,60 +274,70 @@ END TryReceive;
 
 (** Blocking send - waits until message can be sent or channel is closed *)
 PROCEDURE Send*(ch: Channel; item: Collections.ItemPtr);
-VAR done, ok: BOOLEAN;
+VAR done, ok, canProceed: BOOLEAN;
 BEGIN
     done := FALSE;
-    IF (ch = NIL) OR (ch.state # OPEN) THEN done := TRUE END;
-    WHILE ~done DO
+    canProceed := (ch # NIL) & (ch.state = OPEN);
+    
+    IF canProceed THEN
         ok := artPThread.Lock(ch.mutex);
-        IF ok THEN
-            IF ch.state # OPEN THEN
-                ok := artPThread.Unlock(ch.mutex);
-                done := TRUE
-            ELSIF Queue.Count(ch.buffer) < ch.capacity THEN
-                Queue.Enqueue(ch.buffer, item);
-                ok := artPThread.Signal(ch.recvCond);
-                ok := artPThread.Unlock(ch.mutex);
-                done := TRUE
-            ELSE
-                ok := artPThread.Wait(ch.sendCond, ch.mutex);
-                ok := artPThread.Unlock(ch.mutex)
-                (* If locking or waiting fails, we exit the loop to prevent infinite spinning *)
-            END
-        ELSE
-            (* Lock failed - cannot proceed safely *)
+        canProceed := ok
+    END;
+    
+    WHILE canProceed & ~done DO
+        IF ch.state # OPEN THEN
             done := TRUE
+        ELSIF Queue.Count(ch.buffer) < ch.capacity THEN
+            Queue.Enqueue(ch.buffer, item);
+            ok := artPThread.Signal(ch.recvCond);
+            done := TRUE
+        ELSE
+            (* Wait automatically unlocks mutex, waits, then re-locks on wake *)
+            ok := artPThread.Wait(ch.sendCond, ch.mutex);
+            IF ~ok THEN 
+                done := TRUE;
+                canProceed := FALSE
+            END
         END
+    END;
+    
+    IF canProceed THEN
+        ok := artPThread.Unlock(ch.mutex)
     END
 END Send;
 
 (** Blocking receive - waits until message available or channel closed and empty *)
 PROCEDURE Receive*(ch: Channel; VAR item: Collections.ItemPtr);
-VAR done, ok: BOOLEAN;
+VAR done, ok, canProceed: BOOLEAN;
 BEGIN
     done := FALSE;
     item := NIL;
-    IF ch = NIL THEN done := TRUE END;
-    WHILE ~done DO
+    canProceed := ch # NIL;
+    
+    IF canProceed THEN
         ok := artPThread.Lock(ch.mutex);
-        IF ok THEN
-            IF Queue.Count(ch.buffer) > 0 THEN
-                Queue.Dequeue(ch.buffer, item);
-                ok := artPThread.Signal(ch.sendCond);
-                ok := artPThread.Unlock(ch.mutex);
-                done := TRUE
-            ELSIF ch.state = CLOSED THEN
-                ok := artPThread.Unlock(ch.mutex);
-                done := TRUE
-            ELSE
-                ok := artPThread.Wait(ch.recvCond, ch.mutex);
-                ok := artPThread.Unlock(ch.mutex)
-                (* If locking or waiting fails, we exit the loop to prevent infinite spinning *)
-            END
-        ELSE
-            (* Lock failed - cannot proceed safely *)
+        canProceed := ok
+    END;
+    
+    WHILE canProceed & ~done DO
+        IF Queue.Count(ch.buffer) > 0 THEN
+            Queue.Dequeue(ch.buffer, item);
+            ok := artPThread.Signal(ch.sendCond);
             done := TRUE
+        ELSIF ch.state = CLOSED THEN
+            done := TRUE
+        ELSE
+            (* Wait automatically unlocks mutex, waits, then re-locks on wake *)
+            ok := artPThread.Wait(ch.recvCond, ch.mutex);
+            IF ~ok THEN 
+                done := TRUE;
+                canProceed := FALSE
+            END
         END
+    END;
+    
+    IF canProceed THEN
+        ok := artPThread.Unlock(ch.mutex)
     END
 END Receive;
 
