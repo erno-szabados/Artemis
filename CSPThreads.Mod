@@ -173,7 +173,9 @@ PROCEDURE FreeChannel*(VAR ch: Channel);
 BEGIN
     IF ch # NIL THEN
         ch.state := CLOSED;
-        IF ch.buffer # NIL THEN Queue.Clear(ch.buffer) END;
+        IF ch.buffer # NIL THEN 
+            Queue.Free(ch.buffer)  (* Free the queue completely *)
+        END;
         IF ch.mutex # NIL THEN artPThread.FreeMutex(ch.mutex) END;
         IF ch.sendCond # NIL THEN artPThread.FreeCondVar(ch.sendCond) END;
         IF ch.recvCond # NIL THEN artPThread.FreeCondVar(ch.recvCond) END;
