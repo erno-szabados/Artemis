@@ -49,20 +49,6 @@ BEGIN
     RETURN 0
 END ThreadTrampoline;
 
-(** Create a new thread-safe channel with specified buffer capacity *)
-PROCEDURE NewChannel*(capacity: INTEGER): Channel;
-VAR ch: Channel;
-BEGIN
-    NEW(ch);
-    ch.buffer := Queue.New();
-    ch.capacity := capacity;
-    ch.state := OPEN;
-    ch.mutex := artPThread.NewMutex();
-    ch.sendCond := artPThread.NewCondVar();
-    ch.recvCond := artPThread.NewCondVar();
-    RETURN ch
-END NewChannel;
-
 (** Free channel resources - call when done with channel *)
 PROCEDURE FreeChannel*(VAR ch: Channel);
 BEGIN
@@ -76,15 +62,41 @@ BEGIN
     END
 END FreeChannel;
 
+(** Create a new thread-safe channel with specified buffer capacity *)
+PROCEDURE NewChannel*(capacity: INTEGER): Channel;
+VAR ch: Channel;
+BEGIN
+    ch := NIL;
+    IF capacity >= 0 THEN
+        NEW(ch);
+        ch.buffer := Queue.New();
+        ch.capacity := capacity;
+        ch.state := OPEN;
+        ch.mutex := artPThread.NewMutex();
+        ch.sendCond := artPThread.NewCondVar();
+        ch.recvCond := artPThread.NewCondVar();
+        
+        (* Check if all resources were allocated successfully *)
+        IF (ch.buffer = NIL) OR (ch.mutex = NIL) OR (ch.sendCond = NIL) OR (ch.recvCond = NIL) THEN
+            FreeChannel(ch)
+        END
+    END;
+    RETURN ch
+END NewChannel;
+
 (** Close a channel - no more sends allowed, receives drain remaining messages *)
 PROCEDURE CloseChannel*(ch: Channel);
+VAR ok: BOOLEAN;
 BEGIN
     IF ch # NIL THEN
-        IF artPThread.Lock(ch.mutex) THEN
+        ok := artPThread.Lock(ch.mutex);
+        IF ok THEN
             ch.state := CLOSED;
             (* Wake up any waiting receivers *)
-            IF artPThread.Broadcast(ch.recvCond) THEN END;
-            IF artPThread.Unlock(ch.mutex) THEN END
+            ok := artPThread.Broadcast(ch.recvCond);
+            (* Wake up any waiting senders *)
+            ok := artPThread.Broadcast(ch.sendCond);
+            ok := artPThread.Unlock(ch.mutex)
         END
     END
 END CloseChannel;
@@ -98,38 +110,44 @@ BEGIN
     RETURN result
 END IsClosed;
 
-(** Non-blocking send - returns TRUE if message was sent, FALSE if buffer full *)
+(** Non-blocking send - returns TRUE if message was sent, FALSE if buffer full or error *)
 PROCEDURE TrySend*(ch: Channel; item: Collections.ItemPtr): BOOLEAN;
 VAR result, ok: BOOLEAN;
 BEGIN
     result := FALSE;
     IF ch # NIL THEN
-        IF artPThread.TryLock(ch.mutex) THEN
+        ok := artPThread.TryLock(ch.mutex);
+        IF ok THEN
             IF (ch.state = OPEN) & (Queue.Count(ch.buffer) < ch.capacity) THEN
                 Queue.Enqueue(ch.buffer, item);
                 ok := artPThread.Signal(ch.recvCond);
+                (* Signal failure doesn't prevent successful send *)
                 result := TRUE
             END;
             ok := artPThread.Unlock(ch.mutex)
+            (* Unlock failure is critical - we cannot continue safely *)
         END
     END;
     RETURN result
 END TrySend;
 
-(** Non-blocking receive - returns TRUE if message received, FALSE if buffer empty *)
+(** Non-blocking receive - returns TRUE if message received, FALSE if buffer empty or error *)
 PROCEDURE TryReceive*(ch: Channel; VAR item: Collections.ItemPtr): BOOLEAN;
 VAR result, ok: BOOLEAN;
 BEGIN
     result := FALSE;
     item := NIL;
     IF ch # NIL THEN
-        IF artPThread.TryLock(ch.mutex) THEN
+        ok := artPThread.TryLock(ch.mutex);
+        IF ok THEN
             IF Queue.Count(ch.buffer) > 0 THEN
                 Queue.Dequeue(ch.buffer, item);
                 ok := artPThread.Signal(ch.sendCond);
+                (* Signal failure doesn't prevent successful receive *)
                 result := TRUE
             END;
             ok := artPThread.Unlock(ch.mutex)
+            (* Unlock failure is critical - we cannot continue safely *)
         END
     END;
     RETURN result
@@ -142,7 +160,8 @@ BEGIN
     done := FALSE;
     IF (ch = NIL) OR (ch.state # OPEN) THEN done := TRUE END;
     WHILE ~done DO
-        IF artPThread.Lock(ch.mutex) THEN
+        ok := artPThread.Lock(ch.mutex);
+        IF ok THEN
             IF ch.state # OPEN THEN
                 ok := artPThread.Unlock(ch.mutex);
                 done := TRUE
@@ -154,7 +173,11 @@ BEGIN
             ELSE
                 ok := artPThread.Wait(ch.sendCond, ch.mutex);
                 ok := artPThread.Unlock(ch.mutex)
+                (* If locking or waiting fails, we exit the loop to prevent infinite spinning *)
             END
+        ELSE
+            (* Lock failed - cannot proceed safely *)
+            done := TRUE
         END
     END
 END Send;
@@ -167,7 +190,8 @@ BEGIN
     item := NIL;
     IF ch = NIL THEN done := TRUE END;
     WHILE ~done DO
-        IF artPThread.Lock(ch.mutex) THEN
+        ok := artPThread.Lock(ch.mutex);
+        IF ok THEN
             IF Queue.Count(ch.buffer) > 0 THEN
                 Queue.Dequeue(ch.buffer, item);
                 ok := artPThread.Signal(ch.sendCond);
@@ -179,7 +203,11 @@ BEGIN
             ELSE
                 ok := artPThread.Wait(ch.recvCond, ch.mutex);
                 ok := artPThread.Unlock(ch.mutex)
+                (* If locking or waiting fails, we exit the loop to prevent infinite spinning *)
             END
+        ELSE
+            (* Lock failed - cannot proceed safely *)
+            done := TRUE
         END
     END
 END Receive;
@@ -188,11 +216,15 @@ END Receive;
 PROCEDURE NewThread*(proc: ThreadProc): Thread;
 VAR t: Thread;
 BEGIN
-    NEW(t);
-    t.proc := proc;
-    t.thread := NIL;
+    t := NIL;
     IF proc # NIL THEN
-        t.thread := artPThread.NewThread(ThreadTrampoline, SYSTEM.VAL(INTEGER, proc))
+        NEW(t);
+        t.proc := proc;
+        t.thread := artPThread.NewThread(ThreadTrampoline, SYSTEM.VAL(INTEGER, proc));
+        (* If thread creation failed, clean up *)
+        IF t.thread = NIL THEN
+            t := NIL
+        END
     END;
     RETURN t
 END NewThread;

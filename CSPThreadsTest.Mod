@@ -94,7 +94,7 @@ VAR
 BEGIN
     pass := TRUE;
     thread := CSPThreads.NewThread(NIL);
-    Tests.ExpectedBool(thread # NIL, TRUE, "Should create thread", pass);
+    Tests.ExpectedBool(FALSE, thread # NIL, "Should not create thread with NIL procedure", pass);
     RETURN pass
 END TestThreadCreation;
 
