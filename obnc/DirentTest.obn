@@ -1,0 +1,20 @@
+MODULE DirentTest;
+
+IMPORT Tests, Dirent := artDirent, Out, Strings;
+
+VAR ts : Tests.TestSet;
+
+PROCEDURE TestTODO*() : BOOLEAN;
+  VAR pass : BOOLEAN; ds : Dirent.DirScanner;
+BEGIN pass := TRUE;
+  NEW(ds);
+  Tests.ExpectedBool(TRUE, FALSE, "Expected TODO", pass);
+
+  RETURN pass
+END TestTODO;
+
+BEGIN
+  Tests.Init(ts, "Dirent Tests");
+  Tests.Add(ts, TestTODO);
+  ASSERT(Tests.Run(ts));
+END DirentTest.
