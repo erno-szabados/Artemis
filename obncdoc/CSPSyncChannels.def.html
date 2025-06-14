@@ -36,7 +36,6 @@ IMPORT Collections;
 CONST
     OPEN = 0;
     CLOSED = 1;
-    ERROR = -1;
 
 TYPE
     <span class='comment'>(* Thread-safe synchronous channel for rendezvous communication *)</span>
@@ -60,9 +59,6 @@ PROCEDURE <em>NewChannel</em>(): SyncChannel;
 
 <span class='comment'>(* Check if synchronous channel is closed *)</span>
 PROCEDURE <em>IsClosed</em>(ch: SyncChannel): BOOLEAN;
-
-<span class='comment'>(* Check if synchronous channel is in error state *)</span>
-PROCEDURE <em>IsError</em>(ch: SyncChannel): BOOLEAN;
 
 <span class='comment'>(* Non-blocking synchronous send - returns TRUE only if receiver ready *)</span>
 PROCEDURE <em>TrySend</em>(ch: SyncChannel; item: Collections.ItemPtr): BOOLEAN;

@@ -26,7 +26,6 @@ IMPORT Collections;
 CONST
     OPEN = 0;
     CLOSED = 1;
-    ERROR = -1;
 
 TYPE
     (* Thread-safe buffered channel for message passing between threads *)
@@ -46,11 +45,10 @@ PROCEDURE NewChannel(capacity: INTEGER): BufferedChannel;
  *)
 PROCEDURE Close(ch: BufferedChannel);
 
-(* Check if buffered channel is closed *)
+(* Lock free check to test if buffered channel is closed. 
+    This may be stale, but subsequent operations will expose the state change.
+    The behavior is consistent with CSP semantics. *)
 PROCEDURE IsClosed(ch: BufferedChannel): BOOLEAN;
-
-(* Check if buffered channel is in error state *)
-PROCEDURE IsError(ch: BufferedChannel): BOOLEAN;
 
 (* Non-blocking send - returns TRUE if message was sent, FALSE if buffer full or error*)
 PROCEDURE TrySend(ch: BufferedChannel; item: Collections.ItemPtr): BOOLEAN;

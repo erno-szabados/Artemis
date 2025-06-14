@@ -24,7 +24,6 @@ IMPORT Collections;
 CONST
     OPEN = 0;
     CLOSED = 1;
-    ERROR = -1;
 
 TYPE
     (* Thread-safe synchronous channel for rendezvous communication *)
@@ -48,9 +47,6 @@ PROCEDURE NewChannel(): SyncChannel;
 
 (* Check if synchronous channel is closed *)
 PROCEDURE IsClosed(ch: SyncChannel): BOOLEAN;
-
-(* Check if synchronous channel is in error state *)
-PROCEDURE IsError(ch: SyncChannel): BOOLEAN;
 
 (* Non-blocking synchronous send - returns TRUE only if receiver ready *)
 PROCEDURE TrySend(ch: SyncChannel; item: Collections.ItemPtr): BOOLEAN;

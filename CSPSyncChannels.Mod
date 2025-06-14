@@ -24,7 +24,9 @@ IMPORT Collections, artPThread;
 CONST
     OPEN* = 0;
     CLOSED* = 1;
-    ERROR* = -1;
+    (* There is no ERROR state, as setting it would typically occur after threading errors,
+       meaning the state could not be locked reliably, and would be prone to race conditions.
+       We just acknowledge that the system can fail if the underlying pthread calls fail. *)
 
 TYPE
     (** Thread-safe synchronous channel for rendezvous communication *)
@@ -108,14 +110,6 @@ BEGIN
     RETURN result
 END IsClosed;
 
-(** Check if synchronous channel is in error state *)
-PROCEDURE IsError*(ch: SyncChannel): BOOLEAN;
-VAR result: BOOLEAN;
-BEGIN
-    result := FALSE;
-    IF ch # NIL THEN result := ch.state = ERROR END;
-    RETURN result
-END IsError;
 
 (** Non-blocking synchronous send - returns TRUE only if receiver ready *)
 PROCEDURE TrySend*(ch: SyncChannel; item: Collections.ItemPtr): BOOLEAN;
@@ -136,7 +130,6 @@ BEGIN
             ok := artPThread.Unlock(ch.mutex);
             IF ~ok THEN
                 (* Unlock failure is critical - we cannot continue safely *)
-                ch.state := ERROR;
                 result := FALSE
             END
         END
@@ -165,7 +158,6 @@ BEGIN
             ok := artPThread.Unlock(ch.mutex);
             IF ~ok THEN
                 (* Unlock failure is critical - we cannot continue safely *)
-                ch.state := ERROR;
                 result := FALSE
             END
         END
@@ -175,14 +167,16 @@ END TryReceive;
 
 (** Blocking synchronous send - waits for receiver rendezvous *)
 PROCEDURE Send*(ch: SyncChannel; item: Collections.ItemPtr);
-VAR done, ok, canProceed: BOOLEAN;
+VAR done, ok, canProceed, haveMutex: BOOLEAN;
 BEGIN
     done := FALSE;
-    canProceed := (ch # NIL) & (ch.state = OPEN);
+    haveMutex := FALSE;
+    canProceed := (ch # NIL) & (item # NIL) & (ch.state = OPEN);
     
     IF canProceed THEN
         ok := artPThread.Lock(ch.mutex);
-        canProceed := ok
+        canProceed := ok;
+        haveMutex := ok
     END;
     
     WHILE canProceed & ~done DO
@@ -194,6 +188,7 @@ BEGIN
             ch.senderWaiting := FALSE;
             ch.receiverWaiting := FALSE;
             ok := artPThread.Signal(ch.recvCond);
+            (* Signal failure is recoverable *)
             done := TRUE
         ELSE
             (* No receiver ready - wait for one *)
@@ -201,10 +196,12 @@ BEGIN
             ch.pendingItem := item;
             ok := artPThread.Wait(ch.sendCond, ch.mutex);
             IF ~ok THEN 
+                (* Wait failed, but mutex is still held *)
                 ch.senderWaiting := FALSE;
                 ch.pendingItem := NIL;
                 done := TRUE;
                 canProceed := FALSE
+                (* haveMutex remains TRUE - we must unlock *)
             ELSIF ~ch.receiverWaiting THEN
                 (* Woke up but no receiver - someone else got it *)
                 ch.senderWaiting := FALSE;
@@ -214,26 +211,28 @@ BEGIN
         END
     END;
     
-    IF canProceed THEN
+    (* Always unlock if we have the mutex, regardless of how we got here *)
+    IF haveMutex THEN
         ok := artPThread.Unlock(ch.mutex);
         IF ~ok THEN
-            (* Unlock failure is critical - we cannot continue safely *)
-            ch.state := ERROR
+            (* Unlock failure is critical - channel state unknown *)
         END
     END
 END Send;
 
 (** Blocking synchronous receive - waits for sender rendezvous *)
 PROCEDURE Receive*(ch: SyncChannel; VAR item: Collections.ItemPtr);
-VAR done, ok, canProceed: BOOLEAN;
+VAR done, ok, canProceed, haveMutex: BOOLEAN;
 BEGIN
     done := FALSE;
+    haveMutex := FALSE;
     item := NIL;
     canProceed := ch # NIL;
     
     IF canProceed THEN
         ok := artPThread.Lock(ch.mutex);
-        canProceed := ok
+        canProceed := ok;
+        haveMutex := ok
     END;
     
     WHILE canProceed & ~done DO
@@ -246,15 +245,18 @@ BEGIN
             ch.senderWaiting := FALSE;
             ch.receiverWaiting := FALSE;
             ok := artPThread.Signal(ch.sendCond);
+            (* Signal failure is recoverable *)
             done := TRUE
         ELSE
             (* No sender ready - wait for one *)
             ch.receiverWaiting := TRUE;
             ok := artPThread.Wait(ch.recvCond, ch.mutex);
             IF ~ok THEN 
+                (* Wait failed, but mutex is still held *)
                 ch.receiverWaiting := FALSE;
                 done := TRUE;
                 canProceed := FALSE
+                (* haveMutex remains TRUE - we must unlock *)
             ELSIF ~ch.senderWaiting THEN
                 (* Woke up but no sender - someone else got it *)
                 ch.receiverWaiting := FALSE;
@@ -263,11 +265,11 @@ BEGIN
         END
     END;
     
-    IF canProceed THEN
+    (* Always unlock if we have the mutex, regardless of how we got here *)
+    IF haveMutex THEN
         ok := artPThread.Unlock(ch.mutex);
         IF ~ok THEN
-            (* Unlock failure is critical - we cannot continue safely *)
-            ch.state := ERROR
+            (* Unlock failure is critical - channel state unknown *)
         END
     END
 END Receive;

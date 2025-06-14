@@ -38,7 +38,6 @@ IMPORT Collections;
 CONST
     OPEN = 0;
     CLOSED = 1;
-    ERROR = -1;
 
 TYPE
     <span class='comment'>(* Thread-safe buffered channel for message passing between threads *)</span>
@@ -58,11 +57,10 @@ PROCEDURE <em>NewChannel</em>(capacity: INTEGER): BufferedChannel;
  *)</span>
 PROCEDURE <em>Close</em>(ch: BufferedChannel);
 
-<span class='comment'>(* Check if buffered channel is closed *)</span>
+<span class='comment'>(* Lock free check to test if buffered channel is closed. 
+    This may be stale, but subsequent operations will expose the state change.
+    The behavior is consistent with CSP semantics. *)</span>
 PROCEDURE <em>IsClosed</em>(ch: BufferedChannel): BOOLEAN;
-
-<span class='comment'>(* Check if buffered channel is in error state *)</span>
-PROCEDURE <em>IsError</em>(ch: BufferedChannel): BOOLEAN;
 
 <span class='comment'>(* Non-blocking send - returns TRUE if message was sent, FALSE if buffer full or error*)</span>
 PROCEDURE <em>TrySend</em>(ch: BufferedChannel; item: Collections.ItemPtr): BOOLEAN;
