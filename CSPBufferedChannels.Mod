@@ -5,9 +5,7 @@
     - Thread-safe buffered channels with blocking/non-blocking operations
     - Clean CSP-style communication primitives
     
-    This module implements two distinct channel types:
-    
-    BUFFERED CHANNELS:
+    This module implements BUFFERED CHANNELS:
     - Fixed-capacity buffer with FIFO semantics
     - Non-blocking operations (TrySend/TryReceive) for immediate checks
     - Blocking operations (Send/Receive) for guaranteed delivery
@@ -96,7 +94,7 @@ END NewChannel;
 PROCEDURE Close*(ch: BufferedChannel);
 VAR ok: BOOLEAN;
 BEGIN
-    IF ch # NIL THEN
+    IF (ch # NIL) & (ch.mutex # NIL) THEN
         ok := artPThread.Lock(ch.mutex);
         IF ok THEN
             ch.state := CLOSED;
@@ -130,7 +128,7 @@ PROCEDURE TrySend*(ch: BufferedChannel; item: Collections.ItemPtr): BOOLEAN;
 VAR result, ok: BOOLEAN;
 BEGIN
     result := FALSE;
-    IF (ch # NIL) & (item # NIL) THEN
+    IF (ch # NIL) & (item # NIL) & (ch.mutex # NIL) THEN
         ok := artPThread.TryLock(ch.mutex);
         IF ok THEN
             IF (ch.state = OPEN) & (Queue.Count(ch.buffer) < ch.capacity) THEN
@@ -157,7 +155,7 @@ BEGIN
     item := NIL;
     (* You can receive from a closed channel as long as there is data in it 
     - hence no state check here.*)
-    IF (ch # NIL) THEN
+    IF (ch # NIL) & (ch.mutex # NIL) THEN
         ok := artPThread.TryLock(ch.mutex);
         IF ok THEN
             IF Queue.Count(ch.buffer) > 0 THEN
@@ -182,12 +180,16 @@ VAR done, ok, canProceed, haveMutex: BOOLEAN;
 BEGIN
     done := FALSE;
     haveMutex := FALSE;
-    canProceed := (item # NIL) & (ch # NIL) & (ch.state = OPEN);
+    canProceed := (item # NIL) & (ch # NIL);
     
-    IF canProceed THEN
+    IF canProceed & (ch.mutex # NIL) THEN
         ok := artPThread.Lock(ch.mutex);
-        canProceed := ok;
-        haveMutex := ok
+        haveMutex := ok;
+        IF ok THEN
+            canProceed := ch.state = OPEN;
+        ELSE
+            canProceed := FALSE
+        END
     END;
     
     WHILE canProceed & ~done DO
@@ -226,7 +228,7 @@ BEGIN
     - hence no state check here.*)
     canProceed := (ch # NIL);
     
-    IF canProceed THEN
+    IF canProceed & (ch.mutex # NIL) THEN
         ok := artPThread.Lock(ch.mutex);
         canProceed := ok
     END;

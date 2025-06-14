@@ -101,7 +101,9 @@ BEGIN
     RETURN ch
 END NewChannel;
 
-(** Check if synchronous channel is closed *)
+(** Non-blocking check to test if synchronous channel is closed. 
+    This could return stale data, but followup operations failure will expose the error, 
+    and we don't want to block on a test operation. *)
 PROCEDURE IsClosed*(ch: SyncChannel): BOOLEAN;
 VAR result: BOOLEAN;
 BEGIN

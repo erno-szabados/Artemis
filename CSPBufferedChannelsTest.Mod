@@ -37,7 +37,7 @@ BEGIN
     pass := TRUE;
     
     ch := Channels.NewChannel(0);
-    Tests.ExpectedBool(FALSE, Channels.IsClosed(ch), "New buffered channel should be open", pass);
+    Tests.ExpectedBool(TRUE, ch = NIL, "Should not open buffered channel with 0 capacity", pass);
     ch := Channels.NewChannel(5);
     Tests.ExpectedBool(FALSE, Channels.IsClosed(ch), "New buffered channel should be open", pass);
     Channels.Close(ch);
@@ -89,13 +89,6 @@ BEGIN
         receivedTestItem := receivedItem(TestItem);
         Tests.ExpectedInt(2, receivedTestItem.value, "Should receive second item", pass)
     END;
-    
-    (* Test 6: Sync channel should fail without receiver *)
-    ch := Channels.NewChannel(0);
-    success := Channels.TrySend(ch, item1);
-    Tests.ExpectedBool(FALSE, success, "Should not send to sync buffered channel without receiver", pass);
-    success := Channels.TryReceive(ch, receivedItem);
-    Tests.ExpectedBool(FALSE, success, "Should not receive from sync buffered channel without sender", pass);
     
     RETURN pass
 END TestBufferedChannelSynchronous;
