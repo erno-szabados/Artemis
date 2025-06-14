@@ -163,7 +163,9 @@ VAR result, ok: BOOLEAN;
 BEGIN
     result := FALSE;
     item := NIL;
-    IF ch # NIL THEN
+    (* You can receive from a closed channel as long as there is data in it 
+    - hence no state check here.*)
+    IF (ch # NIL) THEN
         ok := artPThread.TryLock(ch.mutex);
         IF ok THEN
             IF Queue.Count(ch.buffer) > 0 THEN
@@ -213,7 +215,11 @@ BEGIN
     END;
     
     IF canProceed THEN
-        ok := artPThread.Unlock(ch.mutex)
+        ok := artPThread.Unlock(ch.mutex);
+        IF ~ok THEN
+            (* Unlock failure is critical - we cannot continue safely *)
+            ch.state := ERROR;
+        END
     END
 END Send;
 
@@ -223,7 +229,9 @@ VAR done, ok, canProceed: BOOLEAN;
 BEGIN
     done := FALSE;
     item := NIL;
-    canProceed := ch # NIL;
+   (* You can receive from a closed channel as long as there is data in it 
+    - hence no state check here.*)
+    canProceed := (ch # NIL);
     
     IF canProceed THEN
         ok := artPThread.Lock(ch.mutex);
@@ -248,7 +256,11 @@ BEGIN
     END;
     
     IF canProceed THEN
-        ok := artPThread.Unlock(ch.mutex)
+        ok := artPThread.Unlock(ch.mutex);
+        IF ~ok THEN
+            (* Unlock failure is critical - we cannot continue safely *)
+            ch.state := ERROR;
+        END
     END
 END Receive;
 

@@ -24,6 +24,7 @@ IMPORT Collections, artPThread;
 CONST
     OPEN* = 0;
     CLOSED* = 1;
+    ERROR* = -1;
 
 TYPE
     (** Thread-safe synchronous channel for rendezvous communication *)
@@ -107,6 +108,15 @@ BEGIN
     RETURN result
 END IsClosed;
 
+(** Check if synchronous channel is in error state *)
+PROCEDURE IsError*(ch: SyncChannel): BOOLEAN;
+VAR result: BOOLEAN;
+BEGIN
+    result := FALSE;
+    IF ch # NIL THEN result := ch.state = ERROR END;
+    RETURN result
+END IsError;
+
 (** Non-blocking synchronous send - returns TRUE only if receiver ready *)
 PROCEDURE TrySend*(ch: SyncChannel; item: Collections.ItemPtr): BOOLEAN;
 VAR result, ok: BOOLEAN;
@@ -123,7 +133,12 @@ BEGIN
                 ok := artPThread.Signal(ch.recvCond);
                 result := TRUE
             END;
-            ok := artPThread.Unlock(ch.mutex)
+            ok := artPThread.Unlock(ch.mutex);
+            IF ~ok THEN
+                (* Unlock failure is critical - we cannot continue safely *)
+                ch.state := ERROR;
+                result := FALSE
+            END
         END
     END;
     RETURN result
@@ -147,7 +162,12 @@ BEGIN
                 ok := artPThread.Signal(ch.sendCond);
                 result := TRUE
             END;
-            ok := artPThread.Unlock(ch.mutex)
+            ok := artPThread.Unlock(ch.mutex);
+            IF ~ok THEN
+                (* Unlock failure is critical - we cannot continue safely *)
+                ch.state := ERROR;
+                result := FALSE
+            END
         END
     END;
     RETURN result
@@ -195,7 +215,11 @@ BEGIN
     END;
     
     IF canProceed THEN
-        ok := artPThread.Unlock(ch.mutex)
+        ok := artPThread.Unlock(ch.mutex);
+        IF ~ok THEN
+            (* Unlock failure is critical - we cannot continue safely *)
+            ch.state := ERROR
+        END
     END
 END Send;
 
@@ -213,7 +237,7 @@ BEGIN
     END;
     
     WHILE canProceed & ~done DO
-        IF ch.state = CLOSED THEN
+        IF ch.state # OPEN THEN
             done := TRUE
         ELSIF ch.senderWaiting & ~ch.receiverWaiting THEN
             (* Sender is waiting - direct handoff *)
@@ -240,7 +264,11 @@ BEGIN
     END;
     
     IF canProceed THEN
-        ok := artPThread.Unlock(ch.mutex)
+        ok := artPThread.Unlock(ch.mutex);
+        IF ~ok THEN
+            (* Unlock failure is critical - we cannot continue safely *)
+            ch.state := ERROR
+        END
     END
 END Receive;
 
