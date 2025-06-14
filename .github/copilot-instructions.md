@@ -23,6 +23,11 @@
   - Use meaningful names for modules, procedures, and variables.
   - Use PascalCase for module names, constants and procedures and camelCase for variables.
 
+## Implementation Guidelines
+- Conceptual clarity is more important than performance.
+- Avoid hidden complexity.
+- Each type has straightforward, focused logic, preferably one concern.
+- Observe type safety.
 
 ## Building
 
