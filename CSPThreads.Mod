@@ -44,8 +44,8 @@ CONST
 
 TYPE
     (** Thread-safe buffered channel for message passing between threads *)
-    Channel* = POINTER TO ChannelDesc;
-    ChannelDesc = RECORD
+    BufferedChannel* = POINTER TO BufferedChannelDesc;
+    BufferedChannelDesc = RECORD
         buffer: Queue.Queue;
         capacity: INTEGER;
         state: INTEGER;
@@ -78,7 +78,7 @@ TYPE
         registryId: INTEGER  (* Safe ID for procedure registry *)
     END;
 
-    (** Registry entry for thread procedures *)
+    (* Registry entry for thread procedures *)
     ThreadProcEntry = POINTER TO ThreadProcEntryDesc;
     ThreadProcEntryDesc = RECORD (Collections.Item)
         proc: ThreadProc
@@ -102,7 +102,7 @@ VAR
     registryMutex: artPThread.Mutex;
     nextRegistryId: INTEGER;
 
-(** Create a ThreadProcEntry for the registry *)
+(* Create a ThreadProcEntry for the registry *)
 PROCEDURE NewThreadProcEntry(proc: ThreadProc): ThreadProcEntry;
 VAR entry: ThreadProcEntry;
 BEGIN
@@ -111,7 +111,7 @@ BEGIN
     RETURN entry
 END NewThreadProcEntry;
 
-(**
+(*
     Safely register a thread procedure and return a registry ID
     
     This is the core of our memory safety solution. Instead of passing
@@ -134,7 +134,7 @@ BEGIN
     RETURN registryId
 END RegisterThreadProc;
 
-(** Safely retrieve a thread procedure by registry ID *)
+(* Safely retrieve a thread procedure by registry ID *)
 PROCEDURE GetThreadProc(registryId: INTEGER): ThreadProc;
 VAR proc: ThreadProc; ok: BOOLEAN; item: Collections.ItemPtr; entry: ThreadProcEntry;
 BEGIN
@@ -151,7 +151,7 @@ BEGIN
     RETURN proc
 END GetThreadProc;
 
-(** Unregister a thread procedure when thread completes *)
+(* Unregister a thread procedure when thread completes *)
 PROCEDURE UnregisterThreadProc(registryId: INTEGER);
 VAR ok, removed: BOOLEAN;
 BEGIN
@@ -162,7 +162,7 @@ BEGIN
     END
 END UnregisterThreadProc;
 
-(**
+(*
     Thread trampoline - bridges C thread creation to Oberon procedures
     
     This procedure is called by the C pthread system with our safe registry ID.
@@ -181,8 +181,8 @@ BEGIN
     RETURN 0
 END ThreadTrampoline;
 
-(** Free channel resources - call when done with channel *)
-PROCEDURE FreeChannel*(VAR ch: Channel);
+(** Free buffered channel resources - call when done with channel *)
+PROCEDURE FreeBufferedChannel*(VAR ch: BufferedChannel);
 BEGIN
     IF ch # NIL THEN
         ch.state := CLOSED;
@@ -194,11 +194,11 @@ BEGIN
         IF ch.recvCond # NIL THEN artPThread.FreeCondVar(ch.recvCond) END;
         ch := NIL
     END
-END FreeChannel;
+END FreeBufferedChannel;
 
-(** Create a new thread-safe channel with specified buffer capacity *)
-PROCEDURE NewChannel*(capacity: INTEGER): Channel;
-VAR ch: Channel;
+(** Create a new thread-safe buffered channel with specified buffer capacity *)
+PROCEDURE NewBufferedChannel*(capacity: INTEGER): BufferedChannel;
+VAR ch: BufferedChannel;
 BEGIN
     ch := NIL;
     IF capacity >= 0 THEN
@@ -212,14 +212,14 @@ BEGIN
         
         (* Check if all resources were allocated successfully *)
         IF (ch.buffer = NIL) OR (ch.mutex = NIL) OR (ch.sendCond = NIL) OR (ch.recvCond = NIL) THEN
-            FreeChannel(ch)
+            FreeBufferedChannel(ch)
         END
     END;
     RETURN ch
-END NewChannel;
+END NewBufferedChannel;
 
-(** Close a channel - no more sends allowed, receives drain remaining messages *)
-PROCEDURE CloseChannel*(ch: Channel);
+(** Close a buffered channel - no more sends allowed, receives drain remaining messages *)
+PROCEDURE CloseBufferedChannel*(ch: BufferedChannel);
 VAR ok: BOOLEAN;
 BEGIN
     IF ch # NIL THEN
@@ -233,19 +233,19 @@ BEGIN
             ok := artPThread.Unlock(ch.mutex)
         END
     END
-END CloseChannel;
+END CloseBufferedChannel;
 
-(** Check if channel is closed *)
-PROCEDURE IsClosed*(ch: Channel): BOOLEAN;
+(** Check if buffered channel is closed *)
+PROCEDURE IsBufferedClosed*(ch: BufferedChannel): BOOLEAN;
 VAR result: BOOLEAN;
 BEGIN
     result := FALSE;
     IF ch # NIL THEN result := ch.state = CLOSED END;
     RETURN result
-END IsClosed;
+END IsBufferedClosed;
 
 (** Non-blocking send - returns TRUE if message was sent, FALSE if buffer full or error *)
-PROCEDURE TrySend*(ch: Channel; item: Collections.ItemPtr): BOOLEAN;
+PROCEDURE TrySend*(ch: BufferedChannel; item: Collections.ItemPtr): BOOLEAN;
 VAR result, ok: BOOLEAN;
 BEGIN
     result := FALSE;
@@ -266,7 +266,7 @@ BEGIN
 END TrySend;
 
 (** Non-blocking receive - returns TRUE if message received, FALSE if buffer empty or error *)
-PROCEDURE TryReceive*(ch: Channel; VAR item: Collections.ItemPtr): BOOLEAN;
+PROCEDURE TryReceive*(ch: BufferedChannel; VAR item: Collections.ItemPtr): BOOLEAN;
 VAR result, ok: BOOLEAN;
 BEGIN
     result := FALSE;
@@ -287,8 +287,8 @@ BEGIN
     RETURN result
 END TryReceive;
 
-(** Blocking send - waits until message can be sent or channel is closed *)
-PROCEDURE Send*(ch: Channel; item: Collections.ItemPtr);
+(** Blocking send - waits until message can be sent or buffered channel is closed *)
+PROCEDURE Send*(ch: BufferedChannel; item: Collections.ItemPtr);
 VAR done, ok, canProceed: BOOLEAN;
 BEGIN
     done := FALSE;
@@ -321,8 +321,8 @@ BEGIN
     END
 END Send;
 
-(** Blocking receive - waits until message available or channel closed and empty *)
-PROCEDURE Receive*(ch: Channel; VAR item: Collections.ItemPtr);
+(** Blocking receive - waits until message available or buffered channel closed and empty *)
+PROCEDURE Receive*(ch: BufferedChannel; VAR item: Collections.ItemPtr);
 VAR done, ok, canProceed: BOOLEAN;
 BEGIN
     done := FALSE;

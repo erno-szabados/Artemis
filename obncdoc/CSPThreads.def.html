@@ -11,8 +11,36 @@
 
 		<pre>
 <span class='comment'>(*
-    CSPThreads.Mod - True concurrency CSP implementation using PThreads
-    Provides channels and process scheduling with OS threads.
+    CSPThreads.Mod - Thread-safe channels and threading utilities for Oberon-07
+    
+    Provides:
+    - Thread-safe buffered channels with blocking/non-blocking operations
+    - Basic thread creation and management using PThreads
+    - Clean CSP-style communication primitives
+    
+    THREAD SAFETY ARCHITECTURE:
+    
+    This module uses a safe thread procedure registry to eliminate memory safety
+    issues when passing Oberon procedure pointers to C pthread functions.
+    
+    Problem: pthread_create() expects a C function pointer, but we need to call
+    Oberon procedures. The naive approach of casting procedure pointers to integers
+    using SYSTEM.VAL() is unsafe and can cause crashes.
+    
+    Solution: Thread Procedure Registry
+    - HashMap-based registry maps safe integer IDs to procedure pointers
+    - ThreadTrampoline() uses the ID to safely lookup the actual procedure
+    - Automatic cleanup when threads complete (both normal and joined)
+    - Thread-safe operations protected by mutex
+    - No arbitrary thread limits (grows dynamically with available memory)
+    
+    Flow:
+    1. NewThread(proc) → RegisterThreadProc(proc) → returns safe integer ID
+    2. pthread_create(ThreadTrampoline, ID) → creates OS thread with safe ID
+    3. ThreadTrampoline(ID) → GetThreadProc(ID) → calls actual procedure
+    4. Thread completion → UnregisterThreadProc(ID) → cleanup registry entry
+    
+    This approach provides complete memory safety while maintaining clean CSP semantics.
     
     Copyright (C) 2025
     Released under The 3-Clause BSD License.
@@ -25,49 +53,89 @@ IMPORT Collections;
 CONST
     OPEN = 0;
     CLOSED = 1;
-    READY = 0;
-    RUNNING = 1;
-    BLOCKED = 2;
-    FINISHED = 3;
 
 TYPE
-    Channel = POINTER TO ChannelDesc;
-    ProcessProc = PROCEDURE;
-    Process = POINTER TO ProcessDesc;
-    Waiter = POINTER TO WaiterDesc;
-    Scheduler = POINTER TO SchedulerDesc;
+    <span class='comment'>(* Thread-safe buffered channel for message passing between threads *)</span>
+    BufferedChannel = POINTER TO BufferedChannelDesc;
 
-PROCEDURE <em>NewChannel</em>(capacity: INTEGER): Channel;
+    <span class='comment'>(* Thread-safe synchronous channel for rendezvous communication *)</span>
+    SyncChannel = POINTER TO SyncChannelDesc;
 
-PROCEDURE <em>FreeChannel</em>(VAR ch: Channel);
+    <span class='comment'>(* Thread procedure signature *)</span>
+    ThreadProc = PROCEDURE;
 
-PROCEDURE <em>CloseChannel</em>(ch: Channel);
+    <span class='comment'>(* Thread handle for managing OS threads *)</span>
+    Thread = POINTER TO ThreadDesc;
 
-PROCEDURE <em>IsClosed</em>(ch: Channel): BOOLEAN;
+<span class='comment'>(* Free buffered channel resources - call when done with channel *)</span>
+PROCEDURE <em>FreeBufferedChannel</em>(VAR ch: BufferedChannel);
 
-PROCEDURE <em>TrySend</em>(ch: Channel; item: Collections.ItemPtr): BOOLEAN;
+<span class='comment'>(* Create a new thread-safe buffered channel with specified buffer capacity *)</span>
+PROCEDURE <em>NewBufferedChannel</em>(capacity: INTEGER): BufferedChannel;
 
-PROCEDURE <em>TryReceive</em>(ch: Channel; VAR item: Collections.ItemPtr): BOOLEAN;
+<span class='comment'>(* Close a buffered channel - no more sends allowed, receives drain remaining messages *)</span>
+PROCEDURE <em>CloseBufferedChannel</em>(ch: BufferedChannel);
 
-PROCEDURE <em>Send</em>(ch: Channel; item: Collections.ItemPtr);
+<span class='comment'>(* Check if buffered channel is closed *)</span>
+PROCEDURE <em>IsBufferedClosed</em>(ch: BufferedChannel): BOOLEAN;
 
-PROCEDURE <em>Receive</em>(ch: Channel; VAR item: Collections.ItemPtr);
+<span class='comment'>(* Non-blocking send - returns TRUE if message was sent, FALSE if buffer full or error *)</span>
+PROCEDURE <em>TrySend</em>(ch: BufferedChannel; item: Collections.ItemPtr): BOOLEAN;
 
-PROCEDURE <em>NewProcess</em>(proc: ProcessProc): Process;
+<span class='comment'>(* Non-blocking receive - returns TRUE if message received, FALSE if buffer empty or error *)</span>
+PROCEDURE <em>TryReceive</em>(ch: BufferedChannel; VAR item: Collections.ItemPtr): BOOLEAN;
 
-PROCEDURE <em>NewScheduler</em>(): Scheduler;
+<span class='comment'>(* Blocking send - waits until message can be sent or buffered channel is closed *)</span>
+PROCEDURE <em>Send</em>(ch: BufferedChannel; item: Collections.ItemPtr);
 
-PROCEDURE <em>AddProcess</em>(sched: Scheduler; proc: Process);
+<span class='comment'>(* Blocking receive - waits until message available or buffered channel closed and empty *)</span>
+PROCEDURE <em>Receive</em>(ch: BufferedChannel; VAR item: Collections.ItemPtr);
 
-PROCEDURE <em>JoinProcess</em>(proc: Process): BOOLEAN;
+<span class='comment'>(* Create and start a new thread *)</span>
+PROCEDURE <em>NewThread</em>(proc: ThreadProc): Thread;
 
-PROCEDURE <em>Yield</em>();
+<span class='comment'>(*
+    Wait for thread to complete
+    
+    Note: We use a dual cleanup strategy for registry entries:
+    1. Normal cleanup in ThreadTrampoline when thread completes normally
+    2. Safety cleanup here in case the thread didn't complete normally
+    This ensures no registry entries are leaked regardless of thread fate.
+*)</span>
+PROCEDURE <em>JoinThread</em>(thread: Thread): BOOLEAN;
 
-PROCEDURE <em>Run</em>(sched: Scheduler);
+<span class='comment'>(* 
+   Synchronous Channel Operations
+   
+   True CSP-style synchronous communication with rendezvous semantics.
+   Sender and receiver block until both are ready, then handoff occurs directly.
+ *)</span>
+
+<span class='comment'>(* Free synchronous channel resources *)</span>
+PROCEDURE <em>FreeSyncChannel</em>(VAR ch: SyncChannel);
+
+<span class='comment'>(* Close a synchronous channel - no more operations allowed *)</span>
+PROCEDURE <em>CloseSyncChannel</em>(ch: SyncChannel);
+
+<span class='comment'>(* Create a new synchronous channel for rendezvous communication *)</span>
+PROCEDURE <em>NewSyncChannel</em>(): SyncChannel;
+
+<span class='comment'>(* Check if synchronous channel is closed *)</span>
+PROCEDURE <em>IsSyncClosed</em>(ch: SyncChannel): BOOLEAN;
+
+<span class='comment'>(* Non-blocking synchronous send - returns TRUE only if receiver ready *)</span>
+PROCEDURE <em>TrySyncSend</em>(ch: SyncChannel; item: Collections.ItemPtr): BOOLEAN;
+
+<span class='comment'>(* Non-blocking synchronous receive - returns TRUE only if sender ready *)</span>
+PROCEDURE <em>TrySyncReceive</em>(ch: SyncChannel; VAR item: Collections.ItemPtr): BOOLEAN;
+
+<span class='comment'>(* Blocking synchronous send - waits for receiver rendezvous *)</span>
+PROCEDURE <em>SyncSend</em>(ch: SyncChannel; item: Collections.ItemPtr);
+
+<span class='comment'>(* Blocking synchronous receive - waits for sender rendezvous *)</span>
+PROCEDURE <em>SyncReceive</em>(ch: SyncChannel; VAR item: Collections.ItemPtr);
 
 PROCEDURE <em>Init</em>();
-
-PROCEDURE <em>DefaultScheduler</em>(): Scheduler;
 
 END CSPThreads.
 </pre>

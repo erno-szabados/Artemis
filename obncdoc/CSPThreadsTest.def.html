@@ -18,21 +18,25 @@
 *)</span>
 DEFINITION <em>CSPThreadsTest</em>;
 
-PROCEDURE <em>TestChannelCreation</em>(): BOOLEAN;
+PROCEDURE <em>TestBufferedChannelCreation</em>(): BOOLEAN;
 
 PROCEDURE <em>TestNonBlockingOperations</em>(): BOOLEAN;
 
-PROCEDURE <em>TestSynchronousChannel</em>(): BOOLEAN;
+PROCEDURE <em>TestBufferedChannelSynchronous</em>(): BOOLEAN;
 
-PROCEDURE <em>TestProcessCreation</em>(): BOOLEAN;
+PROCEDURE <em>TestThreadCreation</em>(): BOOLEAN;
 
-PROCEDURE <em>TestProcessExecution</em>(): BOOLEAN;
+PROCEDURE <em>TestThreadOperations</em>(): BOOLEAN;
 
-PROCEDURE <em>TestClosedChannel</em>(): BOOLEAN;
+PROCEDURE <em>TestClosedBufferedChannel</em>(): BOOLEAN;
 
 PROCEDURE <em>TestChannelDestruction</em>(): BOOLEAN;
 
-PROCEDURE <em>TestProcessJoin</em>(): BOOLEAN;
+PROCEDURE <em>TestSyncChannelCreation</em>(): BOOLEAN;
+
+PROCEDURE <em>TestSyncChannelNonBlocking</em>(): BOOLEAN;
+
+PROCEDURE <em>TestSyncChannelRendezvous</em>(): BOOLEAN;
 
 END CSPThreadsTest.
 </pre>

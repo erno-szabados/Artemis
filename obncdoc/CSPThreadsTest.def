@@ -6,20 +6,24 @@
 *)
 DEFINITION CSPThreadsTest;
 
-PROCEDURE TestChannelCreation(): BOOLEAN;
+PROCEDURE TestBufferedChannelCreation(): BOOLEAN;
 
 PROCEDURE TestNonBlockingOperations(): BOOLEAN;
 
-PROCEDURE TestSynchronousChannel(): BOOLEAN;
+PROCEDURE TestBufferedChannelSynchronous(): BOOLEAN;
 
-PROCEDURE TestProcessCreation(): BOOLEAN;
+PROCEDURE TestThreadCreation(): BOOLEAN;
 
-PROCEDURE TestProcessExecution(): BOOLEAN;
+PROCEDURE TestThreadOperations(): BOOLEAN;
 
-PROCEDURE TestClosedChannel(): BOOLEAN;
+PROCEDURE TestClosedBufferedChannel(): BOOLEAN;
 
 PROCEDURE TestChannelDestruction(): BOOLEAN;
 
-PROCEDURE TestProcessJoin(): BOOLEAN;
+PROCEDURE TestSyncChannelCreation(): BOOLEAN;
+
+PROCEDURE TestSyncChannelNonBlocking(): BOOLEAN;
+
+PROCEDURE TestSyncChannelRendezvous(): BOOLEAN;
 
 END CSPThreadsTest.
