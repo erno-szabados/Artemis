@@ -26,6 +26,7 @@ IMPORT Collections, Queue, artPThread;
 CONST
     OPEN* = 0;
     CLOSED* = 1;
+    ERROR* = -1;
 
 TYPE
     (** Thread-safe buffered channel for message passing between threads *)
@@ -101,7 +102,14 @@ BEGIN
             ok := artPThread.Broadcast(ch.recvCond);
             (* Wake up any waiting senders *)
             ok := artPThread.Broadcast(ch.sendCond);
-            ok := artPThread.Unlock(ch.mutex)
+            ok := artPThread.Unlock(ch.mutex);
+            IF ~ok THEN
+                (* Unlock failure is critical - we cannot continue safely *)
+                ch.state := ERROR
+            END
+        ELSE
+            (* Lock failure *)
+            ch.state := ERROR
         END
     END
 END Close;
@@ -115,7 +123,16 @@ BEGIN
     RETURN result
 END IsClosed;
 
-(** Non-blocking send - returns TRUE if message was sent, FALSE if buffer full or error *)
+(** Check if buffered channel is in error state *)
+PROCEDURE IsError*(ch: BufferedChannel): BOOLEAN;
+VAR result: BOOLEAN;
+BEGIN
+    result := FALSE;
+    IF ch # NIL THEN result := ch.state = ERROR END;
+    RETURN result
+END IsError;
+
+(** Non-blocking send - returns TRUE if message was sent, FALSE if buffer full or error*)
 PROCEDURE TrySend*(ch: BufferedChannel; item: Collections.ItemPtr): BOOLEAN;
 VAR result, ok: BOOLEAN;
 BEGIN
@@ -129,8 +146,12 @@ BEGIN
                 (* Signal failure doesn't prevent successful send *)
                 result := TRUE
             END;
-            result := result & artPThread.Unlock(ch.mutex)
-            (* Unlock failure is critical - we cannot continue safely *)
+            ok := artPThread.Unlock(ch.mutex);
+            IF ~ok THEN
+                (* Unlock failure is critical - we cannot continue safely *)
+                ch.state := ERROR;
+                result := FALSE
+            END
         END
     END;
     RETURN result
@@ -151,8 +172,12 @@ BEGIN
                 (* Signal failure doesn't prevent successful receive *)
                 result := TRUE
             END;
-            result := result & artPThread.Unlock(ch.mutex)
-            (* Unlock failure is critical - we cannot continue safely *)
+            ok := result & artPThread.Unlock(ch.mutex);
+            IF ~ok THEN
+                (* Unlock failure is critical - we cannot continue safely *)
+                ch.state := ERROR;
+                result := FALSE
+            END
         END
     END;
     RETURN result
