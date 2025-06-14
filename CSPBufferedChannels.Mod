@@ -61,12 +61,15 @@ BEGIN
     END
 END Free;
 
-(** Create a new thread-safe buffered channel with specified buffer capacity *)
+(** Create a new thread-safe buffered channel with specified buffer capacity
+    Note: 0 capacity buffered channels are not allowed because they would break 
+    CSP semantics. Use a CSPSyncChannel instead.
+ *)
 PROCEDURE New*(capacity: INTEGER): BufferedChannel;
 VAR ch: BufferedChannel;
 BEGIN
     ch := NIL;
-    IF capacity >= 0 THEN
+    IF capacity > 0 THEN
         NEW(ch);
         ch.buffer := Queue.New();
         ch.capacity := capacity;
