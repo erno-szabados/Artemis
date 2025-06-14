@@ -11,12 +11,12 @@
 
 		<pre>
 <span class='comment'>(*
-    CSPThreads.Mod - Thread-safe channels and threading utilities for Oberon-07
+    CSPThreads.Mod - Thread creation and management utilities for Oberon-07
     
     Provides:
-    - Thread-safe buffered channels with blocking/non-blocking operations
-    - Basic thread creation and management using PThreads
-    - Clean CSP-style communication primitives
+    - Safe thread creation and management using PThreads
+    - Memory-safe procedure registry for thread-to-C interface
+    - Clean thread lifecycle management
     
     THREAD SAFETY ARCHITECTURE:
     
@@ -48,48 +48,12 @@
 *)</span>
 DEFINITION <em>CSPThreads</em>;
 
-IMPORT Collections;
-
-CONST
-    OPEN = 0;
-    CLOSED = 1;
-
 TYPE
-    <span class='comment'>(* Thread-safe buffered channel for message passing between threads *)</span>
-    BufferedChannel = POINTER TO BufferedChannelDesc;
-
-    <span class='comment'>(* Thread-safe synchronous channel for rendezvous communication *)</span>
-    SyncChannel = POINTER TO SyncChannelDesc;
-
     <span class='comment'>(* Thread procedure signature *)</span>
     ThreadProc = PROCEDURE;
 
     <span class='comment'>(* Thread handle for managing OS threads *)</span>
     Thread = POINTER TO ThreadDesc;
-
-<span class='comment'>(* Free buffered channel resources - call when done with channel *)</span>
-PROCEDURE <em>FreeBufferedChannel</em>(VAR ch: BufferedChannel);
-
-<span class='comment'>(* Create a new thread-safe buffered channel with specified buffer capacity *)</span>
-PROCEDURE <em>NewBufferedChannel</em>(capacity: INTEGER): BufferedChannel;
-
-<span class='comment'>(* Close a buffered channel - no more sends allowed, receives drain remaining messages *)</span>
-PROCEDURE <em>CloseBufferedChannel</em>(ch: BufferedChannel);
-
-<span class='comment'>(* Check if buffered channel is closed *)</span>
-PROCEDURE <em>IsBufferedClosed</em>(ch: BufferedChannel): BOOLEAN;
-
-<span class='comment'>(* Non-blocking send - returns TRUE if message was sent, FALSE if buffer full or error *)</span>
-PROCEDURE <em>TrySend</em>(ch: BufferedChannel; item: Collections.ItemPtr): BOOLEAN;
-
-<span class='comment'>(* Non-blocking receive - returns TRUE if message received, FALSE if buffer empty or error *)</span>
-PROCEDURE <em>TryReceive</em>(ch: BufferedChannel; VAR item: Collections.ItemPtr): BOOLEAN;
-
-<span class='comment'>(* Blocking send - waits until message can be sent or buffered channel is closed *)</span>
-PROCEDURE <em>Send</em>(ch: BufferedChannel; item: Collections.ItemPtr);
-
-<span class='comment'>(* Blocking receive - waits until message available or buffered channel closed and empty *)</span>
-PROCEDURE <em>Receive</em>(ch: BufferedChannel; VAR item: Collections.ItemPtr);
 
 <span class='comment'>(* Create and start a new thread *)</span>
 PROCEDURE <em>NewThread</em>(proc: ThreadProc): Thread;
@@ -103,37 +67,6 @@ PROCEDURE <em>NewThread</em>(proc: ThreadProc): Thread;
     This ensures no registry entries are leaked regardless of thread fate.
 *)</span>
 PROCEDURE <em>JoinThread</em>(thread: Thread): BOOLEAN;
-
-<span class='comment'>(* 
-   Synchronous Channel Operations
-   
-   True CSP-style synchronous communication with rendezvous semantics.
-   Sender and receiver block until both are ready, then handoff occurs directly.
- *)</span>
-
-<span class='comment'>(* Free synchronous channel resources *)</span>
-PROCEDURE <em>FreeSyncChannel</em>(VAR ch: SyncChannel);
-
-<span class='comment'>(* Close a synchronous channel - no more operations allowed *)</span>
-PROCEDURE <em>CloseSyncChannel</em>(ch: SyncChannel);
-
-<span class='comment'>(* Create a new synchronous channel for rendezvous communication *)</span>
-PROCEDURE <em>NewSyncChannel</em>(): SyncChannel;
-
-<span class='comment'>(* Check if synchronous channel is closed *)</span>
-PROCEDURE <em>IsSyncClosed</em>(ch: SyncChannel): BOOLEAN;
-
-<span class='comment'>(* Non-blocking synchronous send - returns TRUE only if receiver ready *)</span>
-PROCEDURE <em>TrySyncSend</em>(ch: SyncChannel; item: Collections.ItemPtr): BOOLEAN;
-
-<span class='comment'>(* Non-blocking synchronous receive - returns TRUE only if sender ready *)</span>
-PROCEDURE <em>TrySyncReceive</em>(ch: SyncChannel; VAR item: Collections.ItemPtr): BOOLEAN;
-
-<span class='comment'>(* Blocking synchronous send - waits for receiver rendezvous *)</span>
-PROCEDURE <em>SyncSend</em>(ch: SyncChannel; item: Collections.ItemPtr);
-
-<span class='comment'>(* Blocking synchronous receive - waits for sender rendezvous *)</span>
-PROCEDURE <em>SyncReceive</em>(ch: SyncChannel; VAR item: Collections.ItemPtr);
 
 PROCEDURE <em>Init</em>();
 

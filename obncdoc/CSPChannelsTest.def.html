@@ -3,7 +3,7 @@
 	<head>
 		<meta name='viewport' content='width=device-width, initial-scale=1.0' />
 		<meta http-equiv='Content-Type' content='text/html; charset=utf-8' />
-		<title>DEFINITION CSPThreadsTest</title>
+		<title>DEFINITION CSPChannelsTest</title>
 		<link rel='stylesheet' type='text/css' href='style.css' />
 	</head>
 	<body>
@@ -11,34 +11,33 @@
 
 		<pre>
 <span class='comment'>(*
-    CSPThreadsTest.Mod - Tests for CSPThreads (threaded, concurrent CSP)
+    CSPChannelsTest.Mod - Test suite for CSPChannels module
+    
+    Tests both buffered and synchronous channel functionality including:
+    - Channel creation and resource management
+    - Blocking and non-blocking operations
+    - Channel closure behavior
+    - Synchronous rendezvous semantics
     
     Copyright (C) 2025
     Released under The 3-Clause BSD License.
+    Author: Artemis Project
 *)</span>
-DEFINITION <em>CSPThreadsTest</em>;
+DEFINITION <em>CSPChannelsTest</em>;
 
 PROCEDURE <em>TestBufferedChannelCreation</em>(): BOOLEAN;
 
-PROCEDURE <em>TestNonBlockingOperations</em>(): BOOLEAN;
+PROCEDURE <em>TestBufferedChannelSynchronous</em>(): BOOLEAN;
 
-PROCEDURE <em>TestBufferedChannel</em>(): BOOLEAN;
-
-PROCEDURE <em>TestThreadCreation</em>(): BOOLEAN;
-
-PROCEDURE <em>TestThreadOperations</em>(): BOOLEAN;
+PROCEDURE <em>TestBufferedChannelMemoryManagement</em>(): BOOLEAN;
 
 PROCEDURE <em>TestClosedBufferedChannel</em>(): BOOLEAN;
-
-PROCEDURE <em>TestChannelDestruction</em>(): BOOLEAN;
 
 PROCEDURE <em>TestSyncChannelCreation</em>(): BOOLEAN;
 
 PROCEDURE <em>TestSyncChannelNonBlocking</em>(): BOOLEAN;
 
-PROCEDURE <em>TestSyncChannelRendezvous</em>(): BOOLEAN;
-
-END CSPThreadsTest.
+END CSPChannelsTest.
 </pre>
 	</body>
 </html>

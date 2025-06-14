@@ -10,7 +10,7 @@ PROCEDURE TestBufferedChannelCreation(): BOOLEAN;
 
 PROCEDURE TestNonBlockingOperations(): BOOLEAN;
 
-PROCEDURE TestBufferedChannelSynchronous(): BOOLEAN;
+PROCEDURE TestBufferedChannel(): BOOLEAN;
 
 PROCEDURE TestThreadCreation(): BOOLEAN;
 

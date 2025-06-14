@@ -1,10 +1,10 @@
 (*
-    CSPThreads.Mod - Thread-safe channels and threading utilities for Oberon-07
+    CSPThreads.Mod - Thread creation and management utilities for Oberon-07
     
     Provides:
-    - Thread-safe buffered channels with blocking/non-blocking operations
-    - Basic thread creation and management using PThreads
-    - Clean CSP-style communication primitives
+    - Safe thread creation and management using PThreads
+    - Memory-safe procedure registry for thread-to-C interface
+    - Clean thread lifecycle management
     
     THREAD SAFETY ARCHITECTURE:
     
@@ -36,48 +36,12 @@
 *)
 DEFINITION CSPThreads;
 
-IMPORT Collections;
-
-CONST
-    OPEN = 0;
-    CLOSED = 1;
-
 TYPE
-    (* Thread-safe buffered channel for message passing between threads *)
-    BufferedChannel = POINTER TO BufferedChannelDesc;
-
-    (* Thread-safe synchronous channel for rendezvous communication *)
-    SyncChannel = POINTER TO SyncChannelDesc;
-
     (* Thread procedure signature *)
     ThreadProc = PROCEDURE;
 
     (* Thread handle for managing OS threads *)
     Thread = POINTER TO ThreadDesc;
-
-(* Free buffered channel resources - call when done with channel *)
-PROCEDURE FreeBufferedChannel(VAR ch: BufferedChannel);
-
-(* Create a new thread-safe buffered channel with specified buffer capacity *)
-PROCEDURE NewBufferedChannel(capacity: INTEGER): BufferedChannel;
-
-(* Close a buffered channel - no more sends allowed, receives drain remaining messages *)
-PROCEDURE CloseBufferedChannel(ch: BufferedChannel);
-
-(* Check if buffered channel is closed *)
-PROCEDURE IsBufferedClosed(ch: BufferedChannel): BOOLEAN;
-
-(* Non-blocking send - returns TRUE if message was sent, FALSE if buffer full or error *)
-PROCEDURE TrySend(ch: BufferedChannel; item: Collections.ItemPtr): BOOLEAN;
-
-(* Non-blocking receive - returns TRUE if message received, FALSE if buffer empty or error *)
-PROCEDURE TryReceive(ch: BufferedChannel; VAR item: Collections.ItemPtr): BOOLEAN;
-
-(* Blocking send - waits until message can be sent or buffered channel is closed *)
-PROCEDURE Send(ch: BufferedChannel; item: Collections.ItemPtr);
-
-(* Blocking receive - waits until message available or buffered channel closed and empty *)
-PROCEDURE Receive(ch: BufferedChannel; VAR item: Collections.ItemPtr);
 
 (* Create and start a new thread *)
 PROCEDURE NewThread(proc: ThreadProc): Thread;
@@ -91,37 +55,6 @@ PROCEDURE NewThread(proc: ThreadProc): Thread;
     This ensures no registry entries are leaked regardless of thread fate.
 *)
 PROCEDURE JoinThread(thread: Thread): BOOLEAN;
-
-(* 
-   Synchronous Channel Operations
-   
-   True CSP-style synchronous communication with rendezvous semantics.
-   Sender and receiver block until both are ready, then handoff occurs directly.
- *)
-
-(* Free synchronous channel resources *)
-PROCEDURE FreeSyncChannel(VAR ch: SyncChannel);
-
-(* Close a synchronous channel - no more operations allowed *)
-PROCEDURE CloseSyncChannel(ch: SyncChannel);
-
-(* Create a new synchronous channel for rendezvous communication *)
-PROCEDURE NewSyncChannel(): SyncChannel;
-
-(* Check if synchronous channel is closed *)
-PROCEDURE IsSyncClosed(ch: SyncChannel): BOOLEAN;
-
-(* Non-blocking synchronous send - returns TRUE only if receiver ready *)
-PROCEDURE TrySyncSend(ch: SyncChannel; item: Collections.ItemPtr): BOOLEAN;
-
-(* Non-blocking synchronous receive - returns TRUE only if sender ready *)
-PROCEDURE TrySyncReceive(ch: SyncChannel; VAR item: Collections.ItemPtr): BOOLEAN;
-
-(* Blocking synchronous send - waits for receiver rendezvous *)
-PROCEDURE SyncSend(ch: SyncChannel; item: Collections.ItemPtr);
-
-(* Blocking synchronous receive - waits for sender rendezvous *)
-PROCEDURE SyncReceive(ch: SyncChannel; VAR item: Collections.ItemPtr);
 
 PROCEDURE Init();
 

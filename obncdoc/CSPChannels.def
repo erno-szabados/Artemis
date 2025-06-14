@@ -1,0 +1,100 @@
+(*
+    CSPChannels.Mod - Thread-safe channels for CSP-style communication
+    
+    Provides:
+    - Thread-safe buffered channels with blocking/non-blocking operations
+    - Thread-safe synchronous channels for rendezvous communication
+    - Clean CSP-style communication primitives
+    
+    This module implements two distinct channel types:
+    
+    BUFFERED CHANNELS:
+    - Fixed-capacity buffer with FIFO semantics
+    - Non-blocking operations (TrySend/TryReceive) for immediate checks
+    - Blocking operations (Send/Receive) for guaranteed delivery
+    - Graceful closure with buffer draining
+    
+    SYNCHRONOUS CHANNELS:
+    - True CSP rendezvous semantics
+    - Direct sender-to-receiver handoff with no buffering
+    - Both parties must be ready simultaneously
+    - Ideal for tightly coordinated communication patterns
+    
+    Both channel types are fully thread-safe and use efficient mutex/condition
+    variable synchronization for optimal performance under contention.
+    
+    Copyright (C) 2025
+    Released under The 3-Clause BSD License.
+    Author: Artemis Project
+*)
+DEFINITION CSPChannels;
+
+IMPORT Collections;
+
+CONST
+    OPEN = 0;
+    CLOSED = 1;
+
+TYPE
+    (* Thread-safe buffered channel for message passing between threads *)
+    BufferedChannel = POINTER TO BufferedChannelDesc;
+
+    (* Thread-safe synchronous channel for rendezvous communication *)
+    SyncChannel = POINTER TO SyncChannelDesc;
+
+(* Free buffered channel resources - call when done with channel *)
+PROCEDURE FreeBufferedChannel(VAR ch: BufferedChannel);
+
+(* Create a new thread-safe buffered channel with specified buffer capacity *)
+PROCEDURE NewBufferedChannel(capacity: INTEGER): BufferedChannel;
+
+(* Close a buffered channel - no more sends allowed, receives drain remaining messages *)
+PROCEDURE CloseBufferedChannel(ch: BufferedChannel);
+
+(* Check if buffered channel is closed *)
+PROCEDURE IsBufferedClosed(ch: BufferedChannel): BOOLEAN;
+
+(* Non-blocking send - returns TRUE if message was sent, FALSE if buffer full or error *)
+PROCEDURE TrySend(ch: BufferedChannel; item: Collections.ItemPtr): BOOLEAN;
+
+(* Non-blocking receive - returns TRUE if message received, FALSE if buffer empty or error *)
+PROCEDURE TryReceive(ch: BufferedChannel; VAR item: Collections.ItemPtr): BOOLEAN;
+
+(* Blocking send - waits until message can be sent or buffered channel is closed *)
+PROCEDURE Send(ch: BufferedChannel; item: Collections.ItemPtr);
+
+(* Blocking receive - waits until message available or buffered channel closed and empty *)
+PROCEDURE Receive(ch: BufferedChannel; VAR item: Collections.ItemPtr);
+
+(* 
+   Synchronous Channel Operations
+   
+   True CSP-style synchronous communication with rendezvous semantics.
+   Sender and receiver block until both are ready, then handoff occurs directly.
+ *)
+
+(* Free synchronous channel resources *)
+PROCEDURE FreeSyncChannel(VAR ch: SyncChannel);
+
+(* Close a synchronous channel - no more operations allowed *)
+PROCEDURE CloseSyncChannel(ch: SyncChannel);
+
+(* Create a new synchronous channel for rendezvous communication *)
+PROCEDURE NewSyncChannel(): SyncChannel;
+
+(* Check if synchronous channel is closed *)
+PROCEDURE IsSyncClosed(ch: SyncChannel): BOOLEAN;
+
+(* Non-blocking synchronous send - returns TRUE only if receiver ready *)
+PROCEDURE TrySyncSend(ch: SyncChannel; item: Collections.ItemPtr): BOOLEAN;
+
+(* Non-blocking synchronous receive - returns TRUE only if sender ready *)
+PROCEDURE TrySyncReceive(ch: SyncChannel; VAR item: Collections.ItemPtr): BOOLEAN;
+
+(* Blocking synchronous send - waits for receiver rendezvous *)
+PROCEDURE SyncSend(ch: SyncChannel; item: Collections.ItemPtr);
+
+(* Blocking synchronous receive - waits for sender rendezvous *)
+PROCEDURE SyncReceive(ch: SyncChannel; VAR item: Collections.ItemPtr);
+
+END CSPChannels.

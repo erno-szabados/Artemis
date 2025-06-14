@@ -6,7 +6,7 @@
 *)
 MODULE CSPThreadsTest;
 
-IMPORT CSPThreads, Collections, Tests, artPThread;
+IMPORT CSPThreads, CSPChannels, Collections, Tests, artPThread;
 
 TYPE
     TestMessage = RECORD (Collections.Item)
@@ -27,65 +27,65 @@ END NewMessage;
 
 PROCEDURE TestBufferedChannelCreation*(): BOOLEAN;
 VAR 
-    ch: CSPThreads.BufferedChannel;
+    ch: CSPChannels.BufferedChannel;
     pass: BOOLEAN;
 BEGIN
     pass := TRUE;
-    ch := CSPThreads.NewBufferedChannel(0);
-    Tests.ExpectedBool(FALSE, CSPThreads.IsBufferedClosed(ch), "New buffered channel should be open", pass);
-    ch := CSPThreads.NewBufferedChannel(5);
-    Tests.ExpectedBool(FALSE, CSPThreads.IsBufferedClosed(ch), "New buffered channel should be open", pass);
-    CSPThreads.CloseBufferedChannel(ch);
-    Tests.ExpectedBool(TRUE, CSPThreads.IsBufferedClosed(ch), "Closed buffered channel should report closed", pass);
+    ch := CSPChannels.NewBufferedChannel(0);
+    Tests.ExpectedBool(FALSE, CSPChannels.IsBufferedClosed(ch), "New buffered channel should be open", pass);
+    ch := CSPChannels.NewBufferedChannel(5);
+    Tests.ExpectedBool(FALSE, CSPChannels.IsBufferedClosed(ch), "New buffered channel should be open", pass);
+    CSPChannels.CloseBufferedChannel(ch);
+    Tests.ExpectedBool(TRUE, CSPChannels.IsBufferedClosed(ch), "Closed buffered channel should report closed", pass);
     RETURN pass
 END TestBufferedChannelCreation;
 
 PROCEDURE TestNonBlockingOperations*(): BOOLEAN;
 VAR 
-    ch: CSPThreads.BufferedChannel;
+    ch: CSPChannels.BufferedChannel;
     msg1, msg2: TestMessagePtr;
     result: Collections.ItemPtr;
     success: BOOLEAN;
     pass: BOOLEAN;
 BEGIN
     pass := TRUE;
-    ch := CSPThreads.NewBufferedChannel(2);
+    ch := CSPChannels.NewBufferedChannel(2);
     msg1 := NewMessage(42);
     msg2 := NewMessage(84);
-    success := CSPThreads.TrySend(ch, msg1);
+    success := CSPChannels.TrySend(ch, msg1);
     Tests.ExpectedBool(TRUE, success, "Should send to empty buffer", pass);
-    success := CSPThreads.TrySend(ch, msg2);
+    success := CSPChannels.TrySend(ch, msg2);
     Tests.ExpectedBool(TRUE, success, "Should send to buffer with space", pass);
-    success := CSPThreads.TrySend(ch, NewMessage(126));
+    success := CSPChannels.TrySend(ch, NewMessage(126));
     Tests.ExpectedBool(FALSE, success, "Should not send to full buffer", pass);
-    success := CSPThreads.TryReceive(ch, result);
+    success := CSPChannels.TryReceive(ch, result);
     Tests.ExpectedBool(TRUE, success, "Should receive from buffer", pass);
     Tests.ExpectedInt(42, result(TestMessagePtr).value, "Should receive first message", pass);
-    success := CSPThreads.TryReceive(ch, result);
+    success := CSPChannels.TryReceive(ch, result);
     Tests.ExpectedBool(TRUE, success, "Should receive second message", pass);
     Tests.ExpectedInt(84, result(TestMessagePtr).value, "Should receive second message value", pass);
-    success := CSPThreads.TryReceive(ch, result);
+    success := CSPChannels.TryReceive(ch, result);
     Tests.ExpectedBool(FALSE, success, "Should not receive from empty buffer", pass);
     RETURN pass
 END TestNonBlockingOperations;
 
-PROCEDURE TestBufferedChannelSynchronous*(): BOOLEAN;
+PROCEDURE TestBufferedChannel*(): BOOLEAN;
 VAR 
-    ch: CSPThreads.BufferedChannel;
+    ch: CSPChannels.BufferedChannel;
     msg: TestMessagePtr;
     result: Collections.ItemPtr;
     success: BOOLEAN;
     pass: BOOLEAN;
 BEGIN
     pass := TRUE;
-    ch := CSPThreads.NewBufferedChannel(0);
+    ch := CSPChannels.NewBufferedChannel(0);
     msg := NewMessage(123);
-    success := CSPThreads.TrySend(ch, msg);
-    Tests.ExpectedBool(FALSE, success, "Should not send to sync buffered channel without receiver", pass);
-    success := CSPThreads.TryReceive(ch, result);
-    Tests.ExpectedBool(FALSE, success, "Should not receive from sync buffered channel without sender", pass);
+    success := CSPChannels.TrySend(ch, msg);
+    Tests.ExpectedBool(FALSE, success, "Should not send to buffered channel without receiver", pass);
+    success := CSPChannels.TryReceive(ch, result);
+    Tests.ExpectedBool(FALSE, success, "Should not receive from buffered channel without sender", pass);
     RETURN pass
-END TestBufferedChannelSynchronous;
+END TestBufferedChannel;
 
 PROCEDURE TestThreadCreation*(): BOOLEAN;
 VAR 
@@ -135,88 +135,88 @@ END TestThreadOperations;
 
 PROCEDURE TestClosedBufferedChannel*(): BOOLEAN;
 VAR 
-    ch: CSPThreads.BufferedChannel;
+    ch: CSPChannels.BufferedChannel;
     msg: TestMessagePtr;
     result: Collections.ItemPtr;
     success: BOOLEAN;
     pass: BOOLEAN;
 BEGIN
     pass := TRUE;
-    ch := CSPThreads.NewBufferedChannel(1);
+    ch := CSPChannels.NewBufferedChannel(1);
     msg := NewMessage(999);
-    success := CSPThreads.TrySend(ch, msg);
+    success := CSPChannels.TrySend(ch, msg);
     Tests.ExpectedBool(TRUE, success, "Should send before closing", pass);
-    CSPThreads.CloseBufferedChannel(ch);
-    success := CSPThreads.TrySend(ch, NewMessage(888));
+    CSPChannels.CloseBufferedChannel(ch);
+    success := CSPChannels.TrySend(ch, NewMessage(888));
     Tests.ExpectedBool(FALSE, success, "Should not send to closed buffered channel", pass);
-    success := CSPThreads.TryReceive(ch, result);
+    success := CSPChannels.TryReceive(ch, result);
     Tests.ExpectedBool(TRUE, success, "Should receive buffered message from closed buffered channel", pass);
     Tests.ExpectedInt(999, result(TestMessagePtr).value, "Should receive correct value", pass);
-    success := CSPThreads.TryReceive(ch, result);
+    success := CSPChannels.TryReceive(ch, result);
     Tests.ExpectedBool(FALSE, success, "Should not receive from empty closed buffered channel", pass);
     RETURN pass
 END TestClosedBufferedChannel;
 
 PROCEDURE TestChannelDestruction*(): BOOLEAN;
-VAR ch: CSPThreads.BufferedChannel; pass: BOOLEAN;
+VAR ch: CSPChannels.BufferedChannel; pass: BOOLEAN;
 BEGIN
     pass := TRUE;
-    ch := CSPThreads.NewBufferedChannel(2);
+    ch := CSPChannels.NewBufferedChannel(2);
     Tests.ExpectedBool(FALSE, ch = NIL, "Buffered channel should be created", pass);
-    CSPThreads.FreeBufferedChannel(ch);
+    CSPChannels.FreeBufferedChannel(ch);
     Tests.ExpectedBool(TRUE, ch = NIL, "Buffered channel should be NIL after FreeBufferedChannel", pass);
     RETURN pass
 END TestChannelDestruction;
 
 PROCEDURE TestSyncChannelCreation*(): BOOLEAN;
 VAR 
-    ch: CSPThreads.SyncChannel;
+    ch: CSPChannels.SyncChannel;
     pass: BOOLEAN;
 BEGIN
     pass := TRUE;
-    ch := CSPThreads.NewSyncChannel();
-    Tests.ExpectedBool(FALSE, CSPThreads.IsSyncClosed(ch), "New sync channel should be open", pass);
-    CSPThreads.CloseSyncChannel(ch);
-    Tests.ExpectedBool(TRUE, CSPThreads.IsSyncClosed(ch), "Closed sync channel should report closed", pass);
-    CSPThreads.FreeSyncChannel(ch);
+    ch := CSPChannels.NewSyncChannel();
+    Tests.ExpectedBool(FALSE, CSPChannels.IsSyncClosed(ch), "New sync channel should be open", pass);
+    CSPChannels.CloseSyncChannel(ch);
+    Tests.ExpectedBool(TRUE, CSPChannels.IsSyncClosed(ch), "Closed sync channel should report closed", pass);
+    CSPChannels.FreeSyncChannel(ch);
     Tests.ExpectedBool(TRUE, ch = NIL, "Sync channel should be NIL after free", pass);
     RETURN pass
 END TestSyncChannelCreation;
 
 PROCEDURE TestSyncChannelNonBlocking*(): BOOLEAN;
 VAR 
-    ch: CSPThreads.SyncChannel;
+    ch: CSPChannels.SyncChannel;
     msg: TestMessagePtr;
     result: Collections.ItemPtr;
     success: BOOLEAN;
     pass: BOOLEAN;
 BEGIN
     pass := TRUE;
-    ch := CSPThreads.NewSyncChannel();
+    ch := CSPChannels.NewSyncChannel();
     msg := NewMessage(777);
     
     (* No receiver ready - should fail *)
-    success := CSPThreads.TrySyncSend(ch, msg);
+    success := CSPChannels.TrySyncSend(ch, msg);
     Tests.ExpectedBool(FALSE, success, "Should not send without receiver ready", pass);
     
     (* No sender ready - should fail *)
-    success := CSPThreads.TrySyncReceive(ch, result);
+    success := CSPChannels.TrySyncReceive(ch, result);
     Tests.ExpectedBool(FALSE, success, "Should not receive without sender ready", pass);
     
-    CSPThreads.FreeSyncChannel(ch);
+    CSPChannels.FreeSyncChannel(ch);
     RETURN pass
 END TestSyncChannelNonBlocking;
 
 PROCEDURE TestSyncChannelRendezvous*(): BOOLEAN;
 VAR 
-    ch: CSPThreads.SyncChannel;
+    ch: CSPChannels.SyncChannel;
     msg: TestMessagePtr;
     result: Collections.ItemPtr;
     success: BOOLEAN;
     pass: BOOLEAN;
 BEGIN
     pass := TRUE;
-    ch := CSPThreads.NewSyncChannel();
+    ch := CSPChannels.NewSyncChannel();
     msg := NewMessage(888);
     
     (* Verify that blocking operations would block without counterpart *)
@@ -224,26 +224,26 @@ BEGIN
     (* verify the non-blocking operations behave correctly *)
     
     (* Test 1: No operations succeed without counterpart *)
-    success := CSPThreads.TrySyncSend(ch, msg);
+    success := CSPChannels.TrySyncSend(ch, msg);
     Tests.ExpectedBool(FALSE, success, "Sync send should fail without receiver", pass);
     
-    success := CSPThreads.TrySyncReceive(ch, result);
+    success := CSPChannels.TrySyncReceive(ch, result);
     Tests.ExpectedBool(FALSE, success, "Sync receive should fail without sender", pass);
     
     (* Test 2: Verify sync channel state after failed operations *)
-    Tests.ExpectedBool(FALSE, CSPThreads.IsSyncClosed(ch), "Sync channel should remain open", pass);
+    Tests.ExpectedBool(FALSE, CSPChannels.IsSyncClosed(ch), "Sync channel should remain open", pass);
     
     (* Test 3: Verify sync channel closure behavior *)
-    CSPThreads.CloseSyncChannel(ch);
-    Tests.ExpectedBool(TRUE, CSPThreads.IsSyncClosed(ch), "Sync channel should be closed", pass);
+    CSPChannels.CloseSyncChannel(ch);
+    Tests.ExpectedBool(TRUE, CSPChannels.IsSyncClosed(ch), "Sync channel should be closed", pass);
     
-    success := CSPThreads.TrySyncSend(ch, msg);
+    success := CSPChannels.TrySyncSend(ch, msg);
     Tests.ExpectedBool(FALSE, success, "Should not send to closed sync channel", pass);
     
-    success := CSPThreads.TrySyncReceive(ch, result);
+    success := CSPChannels.TrySyncReceive(ch, result);
     Tests.ExpectedBool(FALSE, success, "Should not receive from closed sync channel", pass);
     
-    CSPThreads.FreeSyncChannel(ch);
+    CSPChannels.FreeSyncChannel(ch);
     RETURN pass
 END TestSyncChannelRendezvous;
 
@@ -251,7 +251,7 @@ BEGIN
     Tests.Init(ts, "CSPThreads Tests");
     Tests.Add(ts, TestBufferedChannelCreation);
     Tests.Add(ts, TestNonBlockingOperations);
-    Tests.Add(ts, TestBufferedChannelSynchronous);
+    Tests.Add(ts, TestBufferedChannel);
     Tests.Add(ts, TestThreadCreation);
     Tests.Add(ts, TestThreadOperations);
     Tests.Add(ts, TestClosedBufferedChannel);
