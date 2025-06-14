@@ -207,6 +207,46 @@ BEGIN
     RETURN pass
 END TestSyncChannelNonBlocking;
 
+PROCEDURE TestSyncChannelRendezvous*(): BOOLEAN;
+VAR 
+    ch: CSPThreads.SyncChannel;
+    msg: TestMessagePtr;
+    result: Collections.ItemPtr;
+    success: BOOLEAN;
+    pass: BOOLEAN;
+BEGIN
+    pass := TRUE;
+    ch := CSPThreads.NewSyncChannel();
+    msg := NewMessage(888);
+    
+    (* Verify that blocking operations would block without counterpart *)
+    (* We can't easily test blocking directly in a simple test, but we can *)
+    (* verify the non-blocking operations behave correctly *)
+    
+    (* Test 1: No operations succeed without counterpart *)
+    success := CSPThreads.TrySyncSend(ch, msg);
+    Tests.ExpectedBool(FALSE, success, "Sync send should fail without receiver", pass);
+    
+    success := CSPThreads.TrySyncReceive(ch, result);
+    Tests.ExpectedBool(FALSE, success, "Sync receive should fail without sender", pass);
+    
+    (* Test 2: Verify channel state after failed operations *)
+    Tests.ExpectedBool(FALSE, CSPThreads.IsSyncClosed(ch), "Channel should remain open", pass);
+    
+    (* Test 3: Verify channel closure behavior *)
+    CSPThreads.CloseSyncChannel(ch);
+    Tests.ExpectedBool(TRUE, CSPThreads.IsSyncClosed(ch), "Channel should be closed", pass);
+    
+    success := CSPThreads.TrySyncSend(ch, msg);
+    Tests.ExpectedBool(FALSE, success, "Should not send to closed sync channel", pass);
+    
+    success := CSPThreads.TrySyncReceive(ch, result);
+    Tests.ExpectedBool(FALSE, success, "Should not receive from closed sync channel", pass);
+    
+    CSPThreads.FreeSyncChannel(ch);
+    RETURN pass
+END TestSyncChannelRendezvous;
+
 BEGIN
     Tests.Init(ts, "CSPThreads Tests");
     Tests.Add(ts, TestChannelCreation);
@@ -218,5 +258,6 @@ BEGIN
     Tests.Add(ts, TestChannelDestruction);
     Tests.Add(ts, TestSyncChannelCreation);
     Tests.Add(ts, TestSyncChannelNonBlocking);
+    Tests.Add(ts, TestSyncChannelRendezvous);
     ASSERT(Tests.Run(ts));
 END CSPThreadsTest.
