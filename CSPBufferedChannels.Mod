@@ -65,10 +65,11 @@ END Free;
     Note: 0 capacity buffered channels are not allowed because they would break 
     CSP semantics. Use a CSPSyncChannel instead.
  *)
-PROCEDURE New*(capacity: INTEGER): BufferedChannel;
+PROCEDURE NewChannel*(capacity: INTEGER): BufferedChannel;
 VAR ch: BufferedChannel;
 BEGIN
     ch := NIL;
+    (* Capacity must be > 0 for buffered channels. Use CSPSyncChannel for synchronous communication. *)
     IF capacity > 0 THEN
         NEW(ch);
         ch.buffer := Queue.New();
@@ -84,9 +85,11 @@ BEGIN
         END
     END;
     RETURN ch
-END New;
+END NewChannel;
 
-(** Close a buffered channel - no more sends allowed, receives drain remaining messages *)
+(** Close a buffered channel - no more sends allowed, receives drain remaining messages 
+  If Unlock fails, the error is ignored, as Close does not return a result.  
+ *)
 PROCEDURE Close*(ch: BufferedChannel);
 VAR ok: BOOLEAN;
 BEGIN
@@ -126,7 +129,7 @@ BEGIN
                 (* Signal failure doesn't prevent successful send *)
                 result := TRUE
             END;
-            ok := artPThread.Unlock(ch.mutex)
+            result := result & artPThread.Unlock(ch.mutex)
             (* Unlock failure is critical - we cannot continue safely *)
         END
     END;
@@ -148,7 +151,7 @@ BEGIN
                 (* Signal failure doesn't prevent successful receive *)
                 result := TRUE
             END;
-            ok := artPThread.Unlock(ch.mutex)
+            result := result & artPThread.Unlock(ch.mutex)
             (* Unlock failure is critical - we cannot continue safely *)
         END
     END;

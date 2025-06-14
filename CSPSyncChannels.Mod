@@ -78,7 +78,7 @@ BEGIN
 END Close;
 
 (** Create a new synchronous channel for rendezvous communication *)
-PROCEDURE New*(): SyncChannel;
+PROCEDURE NewChannel*(): SyncChannel;
 VAR ch: SyncChannel;
 BEGIN
     ch := NIL;
@@ -96,7 +96,7 @@ BEGIN
         Free(ch)
     END;
     RETURN ch
-END New;
+END NewChannel;
 
 (** Check if synchronous channel is closed *)
 PROCEDURE IsClosed*(ch: SyncChannel): BOOLEAN;

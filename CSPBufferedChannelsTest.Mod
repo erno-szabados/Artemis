@@ -36,9 +36,9 @@ VAR pass: BOOLEAN;
 BEGIN
     pass := TRUE;
     
-    ch := Channels.New(0);
+    ch := Channels.NewChannel(0);
     Tests.ExpectedBool(FALSE, Channels.IsClosed(ch), "New buffered channel should be open", pass);
-    ch := Channels.New(5);
+    ch := Channels.NewChannel(5);
     Tests.ExpectedBool(FALSE, Channels.IsClosed(ch), "New buffered channel should be open", pass);
     Channels.Close(ch);
     Tests.ExpectedBool(TRUE, Channels.IsClosed(ch), "Closed buffered channel should report closed", pass);
@@ -60,7 +60,7 @@ BEGIN
     item2 := NewTestItem(2);
     item3 := NewTestItem(3);
     
-    ch := Channels.New(2);
+    ch := Channels.NewChannel(2);
     
     (* Test 1: Send to sync buffered channel should fail without receiver *)
     success := Channels.TrySend(ch, item1);
@@ -91,7 +91,7 @@ BEGIN
     END;
     
     (* Test 6: Sync channel should fail without receiver *)
-    ch := Channels.New(0);
+    ch := Channels.NewChannel(0);
     success := Channels.TrySend(ch, item1);
     Tests.ExpectedBool(FALSE, success, "Should not send to sync buffered channel without receiver", pass);
     success := Channels.TryReceive(ch, receivedItem);
@@ -106,7 +106,7 @@ VAR pass: BOOLEAN;
 BEGIN
     pass := TRUE;
     
-    ch := Channels.New(5);
+    ch := Channels.NewChannel(5);
     Tests.ExpectedBool(FALSE, ch = NIL, "Buffered channel should be created", pass);
     Channels.Free(ch);
     Tests.ExpectedBool(TRUE, ch = NIL, "Buffered channel should be NIL after Free", pass);
@@ -124,7 +124,7 @@ BEGIN
     pass := TRUE;
     
     item := NewTestItem(42);
-    ch := Channels.New(1);
+    ch := Channels.NewChannel(1);
     
     (* Send an item before closing *)
     success := Channels.TrySend(ch, item);

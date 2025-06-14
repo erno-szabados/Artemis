@@ -37,7 +37,7 @@ VAR pass: BOOLEAN;
 BEGIN
     pass := TRUE;
     
-    ch := Channels.New();
+    ch := Channels.NewChannel();
     Tests.ExpectedBool(FALSE, Channels.IsClosed(ch), "New sync channel should be open", pass);
     Channels.Close(ch);
     Tests.ExpectedBool(TRUE, Channels.IsClosed(ch), "Closed sync channel should report closed", pass);
@@ -57,7 +57,7 @@ BEGIN
     pass := TRUE;
     
     item := NewTestItem(99);
-    ch := Channels.New();
+    ch := Channels.NewChannel();
     
     (* Test 1: Non-blocking operations should fail when no partner ready *)
     success := Channels.TrySend(ch, item);
