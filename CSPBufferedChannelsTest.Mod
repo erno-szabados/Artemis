@@ -36,12 +36,12 @@ VAR pass: BOOLEAN;
 BEGIN
     pass := TRUE;
     
-    ch := Channels.NewBufferedChannel(0);
-    Tests.ExpectedBool(FALSE, Channels.IsBufferedClosed(ch), "New buffered channel should be open", pass);
-    ch := Channels.NewBufferedChannel(5);
-    Tests.ExpectedBool(FALSE, Channels.IsBufferedClosed(ch), "New buffered channel should be open", pass);
-    Channels.CloseBufferedChannel(ch);
-    Tests.ExpectedBool(TRUE, Channels.IsBufferedClosed(ch), "Closed buffered channel should report closed", pass);
+    ch := Channels.New(0);
+    Tests.ExpectedBool(FALSE, Channels.IsClosed(ch), "New buffered channel should be open", pass);
+    ch := Channels.New(5);
+    Tests.ExpectedBool(FALSE, Channels.IsClosed(ch), "New buffered channel should be open", pass);
+    Channels.Close(ch);
+    Tests.ExpectedBool(TRUE, Channels.IsClosed(ch), "Closed buffered channel should report closed", pass);
     
     RETURN pass
 END TestBufferedChannelCreation;
@@ -60,7 +60,7 @@ BEGIN
     item2 := NewTestItem(2);
     item3 := NewTestItem(3);
     
-    ch := Channels.NewBufferedChannel(2);
+    ch := Channels.New(2);
     
     (* Test 1: Send to sync buffered channel should fail without receiver *)
     success := Channels.TrySend(ch, item1);
@@ -91,7 +91,7 @@ BEGIN
     END;
     
     (* Test 6: Sync channel should fail without receiver *)
-    ch := Channels.NewBufferedChannel(0);
+    ch := Channels.New(0);
     success := Channels.TrySend(ch, item1);
     Tests.ExpectedBool(FALSE, success, "Should not send to sync buffered channel without receiver", pass);
     success := Channels.TryReceive(ch, receivedItem);
@@ -106,10 +106,10 @@ VAR pass: BOOLEAN;
 BEGIN
     pass := TRUE;
     
-    ch := Channels.NewBufferedChannel(5);
+    ch := Channels.New(5);
     Tests.ExpectedBool(FALSE, ch = NIL, "Buffered channel should be created", pass);
-    Channels.FreeBufferedChannel(ch);
-    Tests.ExpectedBool(TRUE, ch = NIL, "Buffered channel should be NIL after FreeBufferedChannel", pass);
+    Channels.Free(ch);
+    Tests.ExpectedBool(TRUE, ch = NIL, "Buffered channel should be NIL after Free", pass);
     
     RETURN pass
 END TestBufferedChannelMemoryManagement;
@@ -124,11 +124,11 @@ BEGIN
     pass := TRUE;
     
     item := NewTestItem(42);
-    ch := Channels.NewBufferedChannel(1);
+    ch := Channels.New(1);
     
     (* Send an item before closing *)
     success := Channels.TrySend(ch, item);
-    Channels.CloseBufferedChannel(ch);
+    Channels.Close(ch);
     
     (* Should not be able to send to closed channel *)
     success := Channels.TrySend(ch, item);

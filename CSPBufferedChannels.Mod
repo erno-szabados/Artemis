@@ -47,7 +47,7 @@ TYPE
 *)
 
 (** Free buffered channel resources - call when done with channel *)
-PROCEDURE FreeBufferedChannel*(VAR ch: BufferedChannel);
+PROCEDURE Free*(VAR ch: BufferedChannel);
 BEGIN
     IF ch # NIL THEN
         ch.state := CLOSED;
@@ -59,10 +59,10 @@ BEGIN
         IF ch.recvCond # NIL THEN artPThread.FreeCondVar(ch.recvCond) END;
         ch := NIL
     END
-END FreeBufferedChannel;
+END Free;
 
 (** Create a new thread-safe buffered channel with specified buffer capacity *)
-PROCEDURE NewBufferedChannel*(capacity: INTEGER): BufferedChannel;
+PROCEDURE New*(capacity: INTEGER): BufferedChannel;
 VAR ch: BufferedChannel;
 BEGIN
     ch := NIL;
@@ -77,14 +77,14 @@ BEGIN
         
         (* Check if all resources were allocated successfully *)
         IF (ch.buffer = NIL) OR (ch.mutex = NIL) OR (ch.sendCond = NIL) OR (ch.recvCond = NIL) THEN
-            FreeBufferedChannel(ch)
+            Free(ch)
         END
     END;
     RETURN ch
-END NewBufferedChannel;
+END New;
 
 (** Close a buffered channel - no more sends allowed, receives drain remaining messages *)
-PROCEDURE CloseBufferedChannel*(ch: BufferedChannel);
+PROCEDURE Close*(ch: BufferedChannel);
 VAR ok: BOOLEAN;
 BEGIN
     IF ch # NIL THEN
@@ -98,16 +98,16 @@ BEGIN
             ok := artPThread.Unlock(ch.mutex)
         END
     END
-END CloseBufferedChannel;
+END Close;
 
 (** Check if buffered channel is closed *)
-PROCEDURE IsBufferedClosed*(ch: BufferedChannel): BOOLEAN;
+PROCEDURE IsClosed*(ch: BufferedChannel): BOOLEAN;
 VAR result: BOOLEAN;
 BEGIN
     result := FALSE;
     IF ch # NIL THEN result := ch.state = CLOSED END;
     RETURN result
-END IsBufferedClosed;
+END IsClosed;
 
 (** Non-blocking send - returns TRUE if message was sent, FALSE if buffer full or error *)
 PROCEDURE TrySend*(ch: BufferedChannel; item: Collections.ItemPtr): BOOLEAN;

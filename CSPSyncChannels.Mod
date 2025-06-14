@@ -19,7 +19,7 @@
 *)
 MODULE CSPSyncChannels;
 
-IMPORT Collections, Queue, artPThread;
+IMPORT Collections, artPThread;
 
 CONST
     OPEN* = 0;
@@ -47,7 +47,7 @@ TYPE
  *)
 
 (** Free synchronous channel resources *)
-PROCEDURE FreeSyncChannel*(VAR ch: SyncChannel);
+PROCEDURE Free*(VAR ch: SyncChannel);
 BEGIN
     IF ch # NIL THEN
         ch.state := CLOSED;
@@ -59,10 +59,10 @@ BEGIN
         IF ch.recvCond # NIL THEN artPThread.FreeCondVar(ch.recvCond) END;
         ch := NIL
     END
-END FreeSyncChannel;
+END Free;
 
 (** Close a synchronous channel - no more operations allowed *)
-PROCEDURE CloseSyncChannel*(ch: SyncChannel);
+PROCEDURE Close*(ch: SyncChannel);
 VAR ok: BOOLEAN;
 BEGIN
     IF ch # NIL THEN
@@ -75,10 +75,10 @@ BEGIN
             ok := artPThread.Unlock(ch.mutex)
         END
     END
-END CloseSyncChannel;
+END Close;
 
 (** Create a new synchronous channel for rendezvous communication *)
-PROCEDURE NewSyncChannel*(): SyncChannel;
+PROCEDURE New*(): SyncChannel;
 VAR ch: SyncChannel;
 BEGIN
     ch := NIL;
@@ -93,22 +93,22 @@ BEGIN
     
     (* Check if all resources were allocated successfully *)
     IF (ch.mutex = NIL) OR (ch.sendCond = NIL) OR (ch.recvCond = NIL) THEN
-        FreeSyncChannel(ch)
+        Free(ch)
     END;
     RETURN ch
-END NewSyncChannel;
+END New;
 
 (** Check if synchronous channel is closed *)
-PROCEDURE IsSyncClosed*(ch: SyncChannel): BOOLEAN;
+PROCEDURE IsClosed*(ch: SyncChannel): BOOLEAN;
 VAR result: BOOLEAN;
 BEGIN
     result := FALSE;
     IF ch # NIL THEN result := ch.state = CLOSED END;
     RETURN result
-END IsSyncClosed;
+END IsClosed;
 
 (** Non-blocking synchronous send - returns TRUE only if receiver ready *)
-PROCEDURE TrySyncSend*(ch: SyncChannel; item: Collections.ItemPtr): BOOLEAN;
+PROCEDURE TrySend*(ch: SyncChannel; item: Collections.ItemPtr): BOOLEAN;
 VAR result, ok: BOOLEAN;
 BEGIN
     result := FALSE;
@@ -127,10 +127,10 @@ BEGIN
         END
     END;
     RETURN result
-END TrySyncSend;
+END TrySend;
 
 (** Non-blocking synchronous receive - returns TRUE only if sender ready *)
-PROCEDURE TrySyncReceive*(ch: SyncChannel; VAR item: Collections.ItemPtr): BOOLEAN;
+PROCEDURE TryReceive*(ch: SyncChannel; VAR item: Collections.ItemPtr): BOOLEAN;
 VAR result, ok: BOOLEAN;
 BEGIN
     result := FALSE;
@@ -151,10 +151,10 @@ BEGIN
         END
     END;
     RETURN result
-END TrySyncReceive;
+END TryReceive;
 
 (** Blocking synchronous send - waits for receiver rendezvous *)
-PROCEDURE SyncSend*(ch: SyncChannel; item: Collections.ItemPtr);
+PROCEDURE Send*(ch: SyncChannel; item: Collections.ItemPtr);
 VAR done, ok, canProceed: BOOLEAN;
 BEGIN
     done := FALSE;
@@ -197,10 +197,10 @@ BEGIN
     IF canProceed THEN
         ok := artPThread.Unlock(ch.mutex)
     END
-END SyncSend;
+END Send;
 
 (** Blocking synchronous receive - waits for sender rendezvous *)
-PROCEDURE SyncReceive*(ch: SyncChannel; VAR item: Collections.ItemPtr);
+PROCEDURE Receive*(ch: SyncChannel; VAR item: Collections.ItemPtr);
 VAR done, ok, canProceed: BOOLEAN;
 BEGIN
     done := FALSE;
@@ -242,6 +242,6 @@ BEGIN
     IF canProceed THEN
         ok := artPThread.Unlock(ch.mutex)
     END
-END SyncReceive;
+END Receive;
 
 END CSPSyncChannels.

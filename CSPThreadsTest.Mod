@@ -31,12 +31,12 @@ VAR
     pass: BOOLEAN;
 BEGIN
     pass := TRUE;
-    ch := CSPChannels.NewBufferedChannel(0);
-    Tests.ExpectedBool(FALSE, CSPChannels.IsBufferedClosed(ch), "New buffered channel should be open", pass);
-    ch := CSPChannels.NewBufferedChannel(5);
-    Tests.ExpectedBool(FALSE, CSPChannels.IsBufferedClosed(ch), "New buffered channel should be open", pass);
-    CSPChannels.CloseBufferedChannel(ch);
-    Tests.ExpectedBool(TRUE, CSPChannels.IsBufferedClosed(ch), "Closed buffered channel should report closed", pass);
+    ch := CSPChannels.New(0);
+    Tests.ExpectedBool(FALSE, CSPChannels.IsClosed(ch), "New buffered channel should be open", pass);
+    ch := CSPChannels.New(5);
+    Tests.ExpectedBool(FALSE, CSPChannels.IsClosed(ch), "New buffered channel should be open", pass);
+    CSPChannels.Close(ch);
+    Tests.ExpectedBool(TRUE, CSPChannels.IsClosed(ch), "Closed buffered channel should report closed", pass);
     RETURN pass
 END TestBufferedChannelCreation;
 
@@ -49,7 +49,7 @@ VAR
     pass: BOOLEAN;
 BEGIN
     pass := TRUE;
-    ch := CSPChannels.NewBufferedChannel(2);
+    ch := CSPChannels.New(2);
     msg1 := NewMessage(42);
     msg2 := NewMessage(84);
     success := CSPChannels.TrySend(ch, msg1);
@@ -78,7 +78,7 @@ VAR
     pass: BOOLEAN;
 BEGIN
     pass := TRUE;
-    ch := CSPChannels.NewBufferedChannel(0);
+    ch := CSPChannels.New(0);
     msg := NewMessage(123);
     success := CSPChannels.TrySend(ch, msg);
     Tests.ExpectedBool(FALSE, success, "Should not send to buffered channel without receiver", pass);
@@ -142,11 +142,11 @@ VAR
     pass: BOOLEAN;
 BEGIN
     pass := TRUE;
-    ch := CSPChannels.NewBufferedChannel(1);
+    ch := CSPChannels.New(1);
     msg := NewMessage(999);
     success := CSPChannels.TrySend(ch, msg);
     Tests.ExpectedBool(TRUE, success, "Should send before closing", pass);
-    CSPChannels.CloseBufferedChannel(ch);
+    CSPChannels.Close(ch);
     success := CSPChannels.TrySend(ch, NewMessage(888));
     Tests.ExpectedBool(FALSE, success, "Should not send to closed buffered channel", pass);
     success := CSPChannels.TryReceive(ch, result);
@@ -161,10 +161,10 @@ PROCEDURE TestChannelDestruction*(): BOOLEAN;
 VAR ch: CSPChannels.BufferedChannel; pass: BOOLEAN;
 BEGIN
     pass := TRUE;
-    ch := CSPChannels.NewBufferedChannel(2);
+    ch := CSPChannels.New(2);
     Tests.ExpectedBool(FALSE, ch = NIL, "Buffered channel should be created", pass);
-    CSPChannels.FreeBufferedChannel(ch);
-    Tests.ExpectedBool(TRUE, ch = NIL, "Buffered channel should be NIL after FreeBufferedChannel", pass);
+    CSPChannels.Free(ch);
+    Tests.ExpectedBool(TRUE, ch = NIL, "Buffered channel should be NIL after Free", pass);
     RETURN pass
 END TestChannelDestruction;
 
@@ -174,11 +174,11 @@ VAR
     pass: BOOLEAN;
 BEGIN
     pass := TRUE;
-    ch := CSPSyncChannels.NewSyncChannel();
-    Tests.ExpectedBool(FALSE, CSPSyncChannels.IsSyncClosed(ch), "New sync channel should be open", pass);
-    CSPSyncChannels.CloseSyncChannel(ch);
-    Tests.ExpectedBool(TRUE, CSPSyncChannels.IsSyncClosed(ch), "Closed sync channel should report closed", pass);
-    CSPSyncChannels.FreeSyncChannel(ch);
+    ch := CSPSyncChannels.New();
+    Tests.ExpectedBool(FALSE, CSPSyncChannels.IsClosed(ch), "New sync channel should be open", pass);
+    CSPSyncChannels.Close(ch);
+    Tests.ExpectedBool(TRUE, CSPSyncChannels.IsClosed(ch), "Closed sync channel should report closed", pass);
+    CSPSyncChannels.Free(ch);
     Tests.ExpectedBool(TRUE, ch = NIL, "Sync channel should be NIL after free", pass);
     RETURN pass
 END TestSyncChannelCreation;
@@ -192,18 +192,18 @@ VAR
     pass: BOOLEAN;
 BEGIN
     pass := TRUE;
-    ch := CSPSyncChannels.NewSyncChannel();
+    ch := CSPSyncChannels.New();
     msg := NewMessage(777);
     
     (* No receiver ready - should fail *)
-    success := CSPSyncChannels.TrySyncSend(ch, msg);
+    success := CSPSyncChannels.TrySend(ch, msg);
     Tests.ExpectedBool(FALSE, success, "Should not send without receiver ready", pass);
     
     (* No sender ready - should fail *)
-    success := CSPSyncChannels.TrySyncReceive(ch, result);
+    success := CSPSyncChannels.TryReceive(ch, result);
     Tests.ExpectedBool(FALSE, success, "Should not receive without sender ready", pass);
     
-    CSPSyncChannels.FreeSyncChannel(ch);
+    CSPSyncChannels.Free(ch);
     RETURN pass
 END TestSyncChannelNonBlocking;
 
@@ -216,7 +216,7 @@ VAR
     pass: BOOLEAN;
 BEGIN
     pass := TRUE;
-    ch := CSPSyncChannels.NewSyncChannel();
+    ch := CSPSyncChannels.New();
     msg := NewMessage(888);
     
     (* Verify that blocking operations would block without counterpart *)
@@ -224,26 +224,26 @@ BEGIN
     (* verify the non-blocking operations behave correctly *)
     
     (* Test 1: No operations succeed without counterpart *)
-    success := CSPSyncChannels.TrySyncSend(ch, msg);
+    success := CSPSyncChannels.TrySend(ch, msg);
     Tests.ExpectedBool(FALSE, success, "Sync send should fail without receiver", pass);
     
-    success := CSPSyncChannels.TrySyncReceive(ch, result);
+    success := CSPSyncChannels.TryReceive(ch, result);
     Tests.ExpectedBool(FALSE, success, "Sync receive should fail without sender", pass);
     
     (* Test 2: Verify sync channel state after failed operations *)
-    Tests.ExpectedBool(FALSE, CSPSyncChannels.IsSyncClosed(ch), "Sync channel should remain open", pass);
+    Tests.ExpectedBool(FALSE, CSPSyncChannels.IsClosed(ch), "Sync channel should remain open", pass);
     
     (* Test 3: Verify sync channel closure behavior *)
-    CSPSyncChannels.CloseSyncChannel(ch);
-    Tests.ExpectedBool(TRUE, CSPSyncChannels.IsSyncClosed(ch), "Sync channel should be closed", pass);
+    CSPSyncChannels.Close(ch);
+    Tests.ExpectedBool(TRUE, CSPSyncChannels.IsClosed(ch), "Sync channel should be closed", pass);
     
-    success := CSPSyncChannels.TrySyncSend(ch, msg);
+    success := CSPSyncChannels.TrySend(ch, msg);
     Tests.ExpectedBool(FALSE, success, "Should not send to closed sync channel", pass);
     
-    success := CSPSyncChannels.TrySyncReceive(ch, result);
+    success := CSPSyncChannels.TryReceive(ch, result);
     Tests.ExpectedBool(FALSE, success, "Should not receive from closed sync channel", pass);
     
-    CSPSyncChannels.FreeSyncChannel(ch);
+    CSPSyncChannels.Free(ch);
     RETURN pass
 END TestSyncChannelRendezvous;
 
