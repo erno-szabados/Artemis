@@ -41,9 +41,9 @@ BEGIN
             crc := i;
             FOR j := 0 TO 7 DO
                 IF Bitwise.And(crc, 1) # 0 THEN
-                    crc := Bitwise.Xor(Bitwise.Rsh(crc, 1), CRC32_POLY)
+                    crc := Bitwise.Xor(Bitwise.LogicalShiftRight(crc, 1), CRC32_POLY)
                 ELSE
-                    crc := Bitwise.Rsh(crc, 1)
+                    crc := Bitwise.LogicalShiftRight(crc, 1)
                 END
             END;
             crc32Table[i] := crc
@@ -79,7 +79,7 @@ BEGIN
     ASSERT(calc.initialized);
     
     tableIndex := Bitwise.And(Bitwise.Xor(calc.state, byte), 0FFH);
-    calc.state := Bitwise.Xor(Bitwise.Rsh(calc.state, 8), crc32Table[tableIndex])
+    calc.state := Bitwise.Xor(Bitwise.LogicalShiftRight(calc.state, 8), crc32Table[tableIndex])
 END UpdateByte;
 
 (** Update CRC32 with buffer of bytes *)
@@ -121,7 +121,7 @@ BEGIN
     FOR i := 0 TO 7 DO
         digit := Bitwise.And(checksum, 0FH);
         result[pos] := hexChars[digit];
-        checksum := Bitwise.Rsh(checksum, 4);
+        checksum := Bitwise.LogicalShiftRight(checksum, 4);
         DEC(pos)
     END
 END ToString;
@@ -139,37 +139,35 @@ BEGIN
     checksum := 0;
     
     file := Files.Old(filename);
-    IF file = NIL THEN
-        RETURN
-    END;
-    
-    calc := NewCalculator();
-    Init(calc);
-    
-    Files.Set(rider, file, 0);
-    
-    (* Process file in chunks *)
-    WHILE ~rider.eof DO
-        bytesRead := 0;
+    IF file # NIL THEN
+        calc := NewCalculator();
+        Init(calc);
         
-        (* Read chunk into buffer *)
-        FOR i := 0 TO BUFFER_SIZE - 1 DO
-            IF ~rider.eof THEN
-                Files.Read(rider, buffer[i]);
+        Files.Set(rider, file, 0);
+        
+        (* Process file in chunks *)
+        WHILE ~rider.eof DO
+            bytesRead := 0;
+            
+            (* Read chunk into buffer *)
+            FOR i := 0 TO BUFFER_SIZE - 1 DO
                 IF ~rider.eof THEN
-                    INC(bytesRead)
+                    Files.Read(rider, buffer[i]);
+                    IF ~rider.eof THEN
+                        INC(bytesRead)
+                    END
                 END
+            END;
+            
+            (* Update checksum with this chunk *)
+            IF bytesRead > 0 THEN
+                UpdateBuffer(calc, buffer, bytesRead)
             END
         END;
         
-        (* Update checksum with this chunk *)
-        IF bytesRead > 0 THEN
-            UpdateBuffer(calc, buffer, bytesRead)
-        END
-    END;
-    
-    checksum := Finalize(calc);
-    success := TRUE
+        checksum := Finalize(calc);
+        success := TRUE
+    END
 END CalculateFile;
 
 (** Calculate CRC32 for array of characters *)
