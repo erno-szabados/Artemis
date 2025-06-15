@@ -15,6 +15,7 @@
   - Use VAR in procedure parameters for mutable variables.
   - The CASE statement does not have a default case.
   - You cannot substitute a procedure into SYSTEM.VAL(), use a local variable in such cases.
+  - Oberon-07 reintroduced FOR loops, so **use them instead of WHILE loops where appropriate**.
 - **Best Practices**
   - Functions and procedures should be clear, concise, and well-structured.
   - Use helper functions to avoid code duplication.
