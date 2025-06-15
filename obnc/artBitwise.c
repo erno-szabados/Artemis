@@ -106,6 +106,17 @@ OBNC_INTEGER artBitwise__ShiftRight_(OBNC_INTEGER a_, OBNC_INTEGER n_)
     return a_ >> n_;
 }
 
+OBNC_INTEGER artBitwise__LogicalShiftRight_(OBNC_INTEGER a_, OBNC_INTEGER n_)
+{
+    if (n_ >= 32) {
+        return 0;
+    }
+    if (n_ < 0) {
+        return a_;
+    }
+    return (OBNC_INTEGER)((unsigned OBNC_INTEGER)a_ >> n_);
+}
+
 OBNC_INTEGER artBitwise__RotateLeft_(OBNC_INTEGER a_, OBNC_INTEGER n_)
 {
     OBNC_INTEGER normalizedN_ = n_ % 32;

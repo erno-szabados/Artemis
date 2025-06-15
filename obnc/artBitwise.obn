@@ -74,6 +74,10 @@ PROCEDURE ShiftRight*(a: INTEGER; n: INTEGER): INTEGER;
 (** Perform arithmetic shift right operation on an integer. *)
 BEGIN RETURN 0 END ShiftRight;
 
+PROCEDURE LogicalShiftRight*(a: INTEGER; n: INTEGER): INTEGER;
+(** Perform logical shift right operation on an integer (fills with zeros). *)
+BEGIN RETURN 0 END LogicalShiftRight;
+
 PROCEDURE RotateLeft*(a: INTEGER; n: INTEGER): INTEGER;
 (** Perform rotate left operation on an integer. *)
 BEGIN RETURN 0 END RotateLeft;

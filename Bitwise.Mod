@@ -135,7 +135,8 @@ BEGIN
     ELSIF n < 0 THEN
         result := a
     ELSE
-        result := ASR(temp, n)
+        (* For bytes, we always want logical shift (no sign extension) *)
+        result := temp DIV LSL(1, n)  (* Equivalent to logical shift right *)
     END;
     RETURN SYSTEM.VAL(BYTE, result)
 END ShiftRight8;
@@ -209,6 +210,28 @@ BEGIN
     END;
     RETURN result
 END ShiftRight;
+
+PROCEDURE LogicalShiftRight*(a: INTEGER; n: INTEGER): INTEGER;
+(** Perform logical shift right operation on an integer (fills with zeros). *)
+VAR 
+    result: INTEGER;
+    mask: INTEGER;
+BEGIN
+    IF n >= 32 THEN
+        result := 0
+    ELSIF n < 0 THEN
+        result := a
+    ELSE
+        (* Use arithmetic shift but clear sign-extended bits for negative numbers *)
+        result := ASR(a, n);
+        IF a < 0 THEN
+            (* Create mask to clear the sign-extended bits *)
+            mask := ASR(7FFFFFFFH, n - 1);
+            result := And(result, mask)
+        END
+    END;
+    RETURN result
+END LogicalShiftRight;
 
 PROCEDURE RotateLeft*(a: INTEGER; n: INTEGER): INTEGER;
 (** Perform rotate left operation on an integer. *)
