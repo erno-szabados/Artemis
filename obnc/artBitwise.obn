@@ -1,0 +1,85 @@
+(** artBitwise.obn - C-optimized bitwise operations stub.
+
+This is a stub file for generating C wrapper code.
+The actual implementation is in artBitwise.c.
+
+Copyright (C) 2025
+Released under The 3-Clause BSD License.
+*)
+
+MODULE artBitwise;
+
+(** C-optimized bitwise operations for INTEGER and BYTE types.
+    
+    This module provides the same interface as Bitwise but with 
+    optimized C implementations for better performance.
+    
+    NOTE: This module is not portable - it requires C compilation.
+    Use the standard Bitwise module for portable Oberon-07 code.
+*)
+
+PROCEDURE And8*(a, b: BYTE): BYTE;
+(** Perform bitwise AND operation on two bytes. *)
+BEGIN RETURN 0 END And8;
+
+PROCEDURE And*(a, b: INTEGER): INTEGER;
+(** Perform bitwise AND operation on two integers. *)
+BEGIN RETURN 0 END And;
+
+PROCEDURE Or8*(a, b: BYTE): BYTE;
+(** Perform bitwise OR operation on two bytes. *)
+BEGIN RETURN 0 END Or8;
+
+PROCEDURE Or*(a, b: INTEGER): INTEGER;
+(** Perform bitwise OR operation on two integers. *)
+BEGIN RETURN 0 END Or;
+
+PROCEDURE Xor8*(a, b: BYTE): BYTE;
+(** Perform bitwise XOR operation on two bytes. *)
+BEGIN RETURN 0 END Xor8;
+
+PROCEDURE Xor*(a, b: INTEGER): INTEGER;
+(** Perform bitwise XOR operation on two integers. *)
+BEGIN RETURN 0 END Xor;
+
+PROCEDURE Not8*(a: BYTE): BYTE;
+(** Perform bitwise NOT operation on a byte. *)
+BEGIN RETURN 0 END Not8;
+
+PROCEDURE Not*(a: INTEGER): INTEGER;
+(** Perform bitwise NOT operation on an integer. *)
+BEGIN RETURN 0 END Not;
+
+PROCEDURE ShiftLeft8*(a: BYTE; n: INTEGER): BYTE;
+(** Perform shift left operation on a byte. *)
+BEGIN RETURN 0 END ShiftLeft8;
+
+PROCEDURE ShiftRight8*(a: BYTE; n: INTEGER): BYTE;
+(** Perform logical shift right operation on a byte. *)
+BEGIN RETURN 0 END ShiftRight8;
+
+PROCEDURE RotateLeft8*(a: BYTE; n: INTEGER): BYTE;
+(** Perform rotate left operation on a byte. *)
+BEGIN RETURN 0 END RotateLeft8;
+
+PROCEDURE RotateRight8*(a: BYTE; n: INTEGER): BYTE;
+(** Perform rotate right operation on a byte. *)
+BEGIN RETURN 0 END RotateRight8;
+
+PROCEDURE ShiftLeft*(a: INTEGER; n: INTEGER): INTEGER;
+(** Perform shift left operation on an integer. *)
+BEGIN RETURN 0 END ShiftLeft;
+
+PROCEDURE ShiftRight*(a: INTEGER; n: INTEGER): INTEGER;
+(** Perform arithmetic shift right operation on an integer. *)
+BEGIN RETURN 0 END ShiftRight;
+
+PROCEDURE RotateLeft*(a: INTEGER; n: INTEGER): INTEGER;
+(** Perform rotate left operation on an integer. *)
+BEGIN RETURN 0 END RotateLeft;
+
+PROCEDURE RotateRight*(a: INTEGER; n: INTEGER): INTEGER;
+(** Perform rotate right operation on an integer. *)
+BEGIN RETURN 0 END RotateRight;
+
+END artBitwise.

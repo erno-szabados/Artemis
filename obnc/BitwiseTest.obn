@@ -7,7 +7,7 @@ Released under The 3-Clause BSD License.
 
 MODULE BitwiseTest;
 
-IMPORT Bitwise, Tests;
+IMPORT Bitwise := artBitwise, Tests;
 
 VAR
   ts: Tests.TestSet;
