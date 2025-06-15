@@ -14,7 +14,7 @@
   - For bitwise operations, use our own implementation from `Bitwise.mod`.
   - Use VAR in procedure parameters for mutable variables.
   - The CASE statement does not have a default case.
-  - SYSTEM.VAL() does not allow procedure parameters, use a local variable to convert types.
+  - You cannot substitute a procedure into SYSTEM.VAL(), use a local variable in such cases.
 - **Best Practices**
   - Functions and procedures should be clear, concise, and well-structured.
   - Use helper functions to avoid code duplication.
@@ -45,6 +45,7 @@
 - Exported procedures documentation comment lines start with `(**` and end with `*)`, so obncdoc finds them.
 - Internal procedures documentation comment lines start with `(*` and end with `*)`, so they are not included in the API documentation.
 - The header should contain a copyright notice for the 3 clause BSD license, the module name, a brief description, and the author.
+- Be conservative and factual in documentation statements, do not exaggerate.
 
 ## Creating C wrappers
 
