@@ -169,46 +169,43 @@ END TryReceive;
 
 (** Blocking synchronous send - waits for receiver rendezvous *)
 PROCEDURE Send*(ch: SyncChannel; item: Collections.ItemPtr);
-VAR done, ok, canProceed, haveMutex: BOOLEAN;
+VAR done, ok, haveMutex: BOOLEAN;
 BEGIN
     done := FALSE;
     haveMutex := FALSE;
-    canProceed := (ch # NIL) & (item # NIL) & (ch.state = OPEN);
     
-    IF canProceed THEN
+    IF (ch # NIL) & (item # NIL) & (ch.mutex # NIL) THEN
         ok := artPThread.Lock(ch.mutex);
-        canProceed := ok;
-        haveMutex := ok
-    END;
-    
-    WHILE canProceed & ~done DO
-        IF ch.state # OPEN THEN
-            done := TRUE
-        ELSIF ch.receiverWaiting & ~ch.senderWaiting THEN
-            (* Receiver is waiting - direct handoff *)
-            ch.pendingItem := item;
-            ch.senderWaiting := FALSE;
-            ch.receiverWaiting := FALSE;
-            ok := artPThread.Signal(ch.recvCond);
-            (* Signal failure is recoverable *)
-            done := TRUE
-        ELSE
-            (* No receiver ready - wait for one *)
-            ch.senderWaiting := TRUE;
-            ch.pendingItem := item;
-            ok := artPThread.Wait(ch.sendCond, ch.mutex);
-            IF ~ok THEN 
-                (* Wait failed, but mutex is still held *)
-                ch.senderWaiting := FALSE;
-                ch.pendingItem := NIL;
-                done := TRUE;
-                canProceed := FALSE
-                (* haveMutex remains TRUE - we must unlock *)
-            ELSIF ~ch.receiverWaiting THEN
-                (* Woke up but no receiver - someone else got it *)
-                ch.senderWaiting := FALSE;
-                ch.pendingItem := NIL;
+        haveMutex := ok;
+        
+        WHILE ok & ~done DO
+            IF ch.state # OPEN THEN
                 done := TRUE
+            ELSIF ch.receiverWaiting & ~ch.senderWaiting THEN
+                (* Receiver is waiting - direct handoff *)
+                ch.pendingItem := item;
+                ch.senderWaiting := FALSE;
+                ch.receiverWaiting := FALSE;
+                ok := artPThread.Signal(ch.recvCond);
+                (* Signal failure is recoverable *)
+                done := TRUE
+            ELSE
+                (* No receiver ready - wait for one *)
+                ch.senderWaiting := TRUE;
+                ch.pendingItem := item;
+                ok := artPThread.Wait(ch.sendCond, ch.mutex);
+                IF ~ok THEN 
+                    (* Wait failed, but mutex is still held *)
+                    ch.senderWaiting := FALSE;
+                    ch.pendingItem := NIL;
+                    done := TRUE
+                    (* haveMutex remains TRUE - we must unlock *)
+                ELSIF ~ch.receiverWaiting THEN
+                    (* Woke up but no receiver - someone else got it *)
+                    ch.senderWaiting := FALSE;
+                    ch.pendingItem := NIL;
+                    done := TRUE
+                END
             END
         END
     END;
