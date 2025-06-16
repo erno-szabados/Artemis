@@ -1,5 +1,5 @@
 (**
-    CSPSyncChannels.Mod - Thread-safe channels for CSP-style communication
+    Channels.Mod - Thread-safe synchronous channels for concurrent communication
     
     Provides:
     - Thread-safe synchronous channels for rendezvous communication
@@ -17,7 +17,7 @@
     Released under The 3-Clause BSD License.
     Author: Artemis Project
 *)
-MODULE CSPSyncChannels;
+MODULE Channels;
 
 IMPORT Collections, artPThread;
 
@@ -273,4 +273,4 @@ BEGIN
     END
 END Receive;
 
-END CSPSyncChannels.
+END Channels.

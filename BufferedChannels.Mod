@@ -1,5 +1,5 @@
 (**
-    CSPBufferedChannels.Mod - Thread-safe channels for CSP-style communication
+    BufferedChannels.Mod - Thread-safe buffered channels for concurrent communication
     
     Provides:
     - Thread-safe buffered channels with blocking/non-blocking operations
@@ -17,7 +17,7 @@
     Released under The 3-Clause BSD License.
     Author: Artemis Project
 *)
-MODULE CSPBufferedChannels;
+MODULE BufferedChannels;
 
 IMPORT Collections, Queue, artPThread;
 
@@ -258,4 +258,4 @@ BEGIN
     END
 END Receive;
 
-END CSPBufferedChannels.
+END BufferedChannels.

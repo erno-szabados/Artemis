@@ -6,14 +6,14 @@
     fileJobChan, resultChan: Channels.BufferedChannel;
     fileCount: INTEGER;
     worker1, worker2: CSPThreads.Thread;tory checksumming tool example
-    Demonstrates: CSPThreads, CSPBufferedChannels, artDirent, CRC32, extArgs, Files, Out
+    Demonstrates: Threads, BufferedChannels, artDirent, CRC32, extArgs, Files, Out
     Copyright (C) 2025
     Released under The 3-Clause BSD License.
     Author: Artemis Project
 *)
 MODULE ExampleDirChecksum;
 
-IMPORT Out, extArgs, artDirent, Channels := CSPBufferedChannels, Chars, Collections, Files, CRC32, CSPThreads;
+IMPORT Out, extArgs, artDirent, Channels := BufferedChannels, Chars, Collections, Files, CRC32, Threads;
 
 CONST
     UsageMsg = "Usage: ExampleDirChecksum <directory>";
@@ -41,7 +41,7 @@ VAR
     res: INTEGER;
     fileJobChan, resultChan: Channels.BufferedChannel;
     fileCount: INTEGER;
-    worker1, worker2 : CSPThreads.Thread;
+    worker1, worker2 : Threads.Thread;
     ok : BOOLEAN;
 
 PROCEDURE WorkerThread();
@@ -164,16 +164,16 @@ BEGIN
         
         (* Start worker threads *)
         Out.String("Starting "); Out.Int(NumWorkers, 0); Out.String(" worker threads..."); Out.Ln;
-        worker1 := CSPThreads.NewThread(WorkerThread);
-        worker2 := CSPThreads.NewThread(WorkerThread);
+        worker1 := Threads.NewThread(WorkerThread);
+        worker2 := Threads.NewThread(WorkerThread);
         
         (* Close job channel to signal workers to finish *)
         Channels.Close(fileJobChan);
         
         (* Wait for workers to complete *)
         Out.String("Waiting for workers to complete..."); Out.Ln;
-        ok := CSPThreads.JoinThread(worker1);
-        ok := CSPThreads.JoinThread(worker2);
+        ok := Threads.JoinThread(worker1);
+        ok := Threads.JoinThread(worker2);
         
         (* Collect and print results *)
         Out.String("Collecting results..."); Out.Ln;

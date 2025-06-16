@@ -1,5 +1,5 @@
 (**
-    CSPThreads.Mod - Thread creation and management utilities for Oberon-07
+    Threads.Mod - Thread creation and management utilities for Oberon-07
     
     Provides:
     - Safe thread creation and management using PThreads
@@ -34,7 +34,7 @@
     Released under The 3-Clause BSD License.
     Author: Artemis Project
 *)
-MODULE CSPThreads;
+MODULE Threads;
 
 IMPORT Collections, HashMap, artPThread;
 
@@ -210,4 +210,4 @@ END Init;
 
 BEGIN
     Init();
-END CSPThreads.
+END Threads.
