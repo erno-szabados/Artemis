@@ -9,17 +9,18 @@
 MODULE artPThread;
 
 CONST
-    Ok* = 0;  (** Operation successful *)
-    InvalidHandle* = 1;  (** Invalid handle or pointer *)
-    Deadlock* = 2;  (** Deadlock detected *)
-    ResourceExhausted* = 3;  (** Out of resources *)
-    NotOwner* = 4;  (** Not owner of mutex *)
-    Busy* = 5;  (** Resource busy *)
-    MaxRecursion* = 7;      (** Maximum recursion exceeded (EAGAIN) *)
-    NotRecoverable* = 8;    (** State not recoverable (ENOTRECOVERABLE) *)
-    OwnerDead* = 9;         (** Previous owner died (EOWNERDEAD) *)
-    Timeout* = 10;          (** Timed out (ETIMEDOUT, for condvar timed wait) *)
-    UnknownError* = 100;  (** Unknown or unexpected error *)
+    Ok* = 0;  
+    InvalidHandle* = 1; 
+    InvalidMutex* = 2;
+    Deadlock* = 3; 
+    ResourceExhausted* = 4; 
+    NotOwner* = 5;  
+    Busy* = 6;  
+    MaxRecursion* = 7;     
+    NotRecoverable* = 8;   
+    OwnerDead* = 9;         
+    Timeout* = 10;          
+    UnknownError* = 100;  
 
 TYPE
     (** Opaque mutex type *)
