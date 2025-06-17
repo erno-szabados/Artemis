@@ -40,9 +40,9 @@ VAR
     dir: ARRAY MaxNameLen OF CHAR;
     res: INTEGER;
     fileJobChan, resultChan: Channels.BufferedChannel;
-    fileCount: INTEGER;
     worker1, worker2, collector : Threads.Thread;
-    ok, debugMode: BOOLEAN;
+    debugMode: BOOLEAN;
+    ok: BOOLEAN;  (* Local to main procedure only *)
     (* The allocator in obnc is probably not thread-safe - we try to play nice here. *)
     printMutex : artPThread.Mutex;
 
@@ -139,6 +139,8 @@ VAR
     name: ARRAY MaxNameLen OF CHAR;
     isDir: BOOLEAN;
     job: FileJob;
+    ok: BOOLEAN;
+    fileCount: INTEGER;
 BEGIN
     fileCount := 0;
     scanner := artDirent.OpenScanner(path);
