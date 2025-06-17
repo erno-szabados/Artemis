@@ -92,45 +92,45 @@ END NewThreadProcEntry;
     a safe integer ID that can be passed to C functions.
 *)
 PROCEDURE RegisterThreadProc(proc: ThreadProc): INTEGER;
-VAR registryId: INTEGER; ok: BOOLEAN; entry: ThreadProcEntry;
+VAR registryId: INTEGER; result: INTEGER; entry: ThreadProcEntry;
 BEGIN
     registryId := -1;
-    ok := artPThread.Lock(registryMutex);
-    IF ok THEN
+    result := artPThread.Lock(registryMutex);
+    IF result = artPThread.Ok THEN
         registryId := nextRegistryId;
         INC(nextRegistryId);
         entry := NewThreadProcEntry(proc);
         HashMap.Put(threadProcRegistry, registryId, entry);
-        ok := artPThread.Unlock(registryMutex)
+        result := artPThread.Unlock(registryMutex)
     END;
     RETURN registryId
 END RegisterThreadProc;
 
 (* Safely retrieve a thread procedure by registry ID *)
 PROCEDURE GetThreadProc(registryId: INTEGER): ThreadProc;
-VAR proc: ThreadProc; ok: BOOLEAN; item: Collections.ItemPtr; entry: ThreadProcEntry;
+VAR proc: ThreadProc; ok: BOOLEAN; result: INTEGER; item: Collections.ItemPtr; entry: ThreadProcEntry;
 BEGIN
     proc := NIL;
-    ok := artPThread.Lock(registryMutex);
+    ok := artPThread.Ok = artPThread.Lock(registryMutex);
     IF ok THEN
         ok := HashMap.Get(threadProcRegistry, registryId, item);
         IF ok & (item # NIL) THEN
             entry := item(ThreadProcEntry);
             proc := entry.proc
         END;
-        ok := artPThread.Unlock(registryMutex)
+        result := artPThread.Unlock(registryMutex)
     END;
     RETURN proc
 END GetThreadProc;
 
 (* Unregister a thread procedure when thread completes *)
 PROCEDURE UnregisterThreadProc(registryId: INTEGER);
-VAR ok, removed: BOOLEAN;
+VAR ok, removed: BOOLEAN; result: INTEGER;
 BEGIN
-    ok := artPThread.Lock(registryMutex);
+    ok := artPThread.Ok = artPThread.Lock(registryMutex);
     IF ok THEN
         removed := HashMap.Remove(threadProcRegistry, registryId);
-        ok := artPThread.Unlock(registryMutex)
+        result := artPThread.Unlock(registryMutex)
     END
 END UnregisterThreadProc;
 
@@ -189,7 +189,7 @@ VAR ok: BOOLEAN;
 BEGIN
     ok := FALSE;
     IF (thread # NIL) & (thread.thread # NIL) THEN
-        ok := artPThread.Join(thread.thread);
+        ok := artPThread.Ok = artPThread.Join(thread.thread);
         (* Clean up registry entry if join was successful *)
         (* Note: registry cleanup also happens in ThreadTrampoline, but we do it here *)
         (* as a safety measure in case the thread didn't complete normally *)

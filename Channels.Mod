@@ -69,13 +69,13 @@ PROCEDURE Close*(ch: SyncChannel);
 VAR ok: BOOLEAN;
 BEGIN
     IF ch # NIL THEN
-        ok := artPThread.Lock(ch.mutex);
+        ok := artPThread.Ok = artPThread.Lock(ch.mutex);
         IF ok THEN
             ch.state := CLOSED;
             (* Wake up any waiting threads *)
-            ok := artPThread.Broadcast(ch.sendCond);
-            ok := artPThread.Broadcast(ch.recvCond);
-            ok := artPThread.Unlock(ch.mutex)
+            ok := artPThread.Ok = artPThread.Broadcast(ch.sendCond);
+            ok := artPThread.Ok = artPThread.Broadcast(ch.recvCond);
+            ok := artPThread.Ok = artPThread.Unlock(ch.mutex)
         END
     END
 END Close;
@@ -119,17 +119,17 @@ VAR result, ok: BOOLEAN;
 BEGIN
     result := FALSE;
     IF ch # NIL THEN
-        ok := artPThread.TryLock(ch.mutex);
+        ok := artPThread.Ok = artPThread.TryLock(ch.mutex);
         IF ok THEN
             IF (ch.state = OPEN) & ch.receiverWaiting & ~ch.senderWaiting THEN
                 (* Direct handoff to waiting receiver *)
                 ch.pendingItem := item;
                 ch.senderWaiting := FALSE;
                 ch.receiverWaiting := FALSE;
-                ok := artPThread.Signal(ch.recvCond);
+                ok := artPThread.Ok = artPThread.Signal(ch.recvCond);
                 result := TRUE
             END;
-            ok := artPThread.Unlock(ch.mutex);
+            ok := artPThread.Ok = artPThread.Unlock(ch.mutex);
             IF ~ok THEN
                 (* Unlock failure is critical - we cannot continue safely *)
                 result := FALSE
@@ -146,7 +146,7 @@ BEGIN
     result := FALSE;
     item := NIL;
     IF ch # NIL THEN
-        ok := artPThread.TryLock(ch.mutex);
+        ok := artPThread.Ok = artPThread.TryLock(ch.mutex);
         IF ok THEN
             IF (ch.state = OPEN) & ch.senderWaiting & ~ch.receiverWaiting THEN
                 (* Direct handoff from waiting sender *)
@@ -154,10 +154,10 @@ BEGIN
                 ch.pendingItem := NIL;
                 ch.senderWaiting := FALSE;
                 ch.receiverWaiting := FALSE;
-                ok := artPThread.Signal(ch.sendCond);
+                ok := artPThread.Ok = artPThread.Signal(ch.sendCond);
                 result := TRUE
             END;
-            ok := artPThread.Unlock(ch.mutex);
+            ok := artPThread.Ok = artPThread.Unlock(ch.mutex);
             IF ~ok THEN
                 (* Unlock failure is critical - we cannot continue safely *)
                 result := FALSE
@@ -175,7 +175,7 @@ BEGIN
     haveMutex := FALSE;
     
     IF (ch # NIL) & (item # NIL) & (ch.mutex # NIL) THEN
-        ok := artPThread.Lock(ch.mutex);
+        ok := artPThread.Ok = artPThread.Lock(ch.mutex);
         haveMutex := ok;
         
         WHILE ok & ~done DO
@@ -186,14 +186,14 @@ BEGIN
                 ch.pendingItem := item;
                 ch.senderWaiting := FALSE;
                 ch.receiverWaiting := FALSE;
-                ok := artPThread.Signal(ch.recvCond);
+                ok := artPThread.Ok = artPThread.Signal(ch.recvCond);
                 (* Signal failure is recoverable *)
                 done := TRUE
             ELSE
                 (* No receiver ready - wait for one *)
                 ch.senderWaiting := TRUE;
                 ch.pendingItem := item;
-                ok := artPThread.Wait(ch.sendCond, ch.mutex);
+                ok := artPThread.Ok = artPThread.Wait(ch.sendCond, ch.mutex);
                 IF ~ok THEN 
                     (* Wait failed, but mutex is still held *)
                     ch.senderWaiting := FALSE;
@@ -212,7 +212,7 @@ BEGIN
     
     (* Always unlock if we have the mutex, regardless of how we got here *)
     IF haveMutex THEN
-        ok := artPThread.Unlock(ch.mutex);
+        ok := artPThread.Ok = artPThread.Unlock(ch.mutex);
         IF ~ok THEN
             (* Unlock failure is critical - channel state unknown *)
         END
@@ -229,7 +229,7 @@ BEGIN
     canProceed := ch # NIL;
     
     IF canProceed THEN
-        ok := artPThread.Lock(ch.mutex);
+        ok := artPThread.Ok = artPThread.Lock(ch.mutex);
         canProceed := ok;
         haveMutex := ok
     END;
@@ -243,13 +243,13 @@ BEGIN
             ch.pendingItem := NIL;
             ch.senderWaiting := FALSE;
             ch.receiverWaiting := FALSE;
-            ok := artPThread.Signal(ch.sendCond);
+            ok := artPThread.Ok = artPThread.Signal(ch.sendCond);
             (* Signal failure is recoverable *)
             done := TRUE
         ELSE
             (* No sender ready - wait for one *)
             ch.receiverWaiting := TRUE;
-            ok := artPThread.Wait(ch.recvCond, ch.mutex);
+            ok := artPThread.Ok = artPThread.Wait(ch.recvCond, ch.mutex);
             IF ~ok THEN 
                 (* Wait failed, but mutex is still held *)
                 ch.receiverWaiting := FALSE;
@@ -266,7 +266,7 @@ BEGIN
     
     (* Always unlock if we have the mutex, regardless of how we got here *)
     IF haveMutex THEN
-        ok := artPThread.Unlock(ch.mutex);
+        ok := artPThread.Ok = artPThread.Unlock(ch.mutex);
         IF ~ok THEN
             (* Unlock failure is critical - channel state unknown *)
         END
