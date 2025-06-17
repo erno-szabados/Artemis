@@ -89,29 +89,33 @@ BEGIN
 END NewChannel;
 
 (** Close a buffered channel - no more sends allowed, receives drain remaining messages 
-  If any thread operation fails, FALSE returned.
- *)
+    Returns TRUE if channel was successfully closed, FALSE on error *)
 PROCEDURE Close*(ch: BufferedChannel) : BOOLEAN;
-VAR ok: BOOLEAN;
+VAR success: BOOLEAN; lockResult, unlockResult: INTEGER;
 BEGIN
-    ok := FALSE;
+    success := FALSE;
     IF (ch # NIL) & (ch.mutex # NIL) THEN
-        ok := artPThread.Ok = artPThread.Lock(ch.mutex);
-        IF ok THEN
+        lockResult := artPThread.Lock(ch.mutex);
+        IF lockResult = artPThread.Ok THEN
             ch.state := CLOSED;
-            (* Wake up any waiting receivers *)
-            ok := artPThread.Ok = artPThread.Broadcast(ch.recvCond);
-            (* Wake up any waiting senders *)
-            ok := artPThread.Ok = artPThread.Broadcast(ch.sendCond);
-            ok := artPThread.Ok = artPThread.Unlock(ch.mutex);
-            IF ~ok THEN
-                (* Unlock failure is critical - we cannot continue safely *)
-            END
+            (* Wake up any waiting receivers - ignore broadcast failures as they're recoverable *)
+            lockResult := artPThread.Broadcast(ch.recvCond);
+            (* Wake up any waiting senders - ignore broadcast failures as they're recoverable *)
+            lockResult := artPThread.Broadcast(ch.sendCond);
+            success := TRUE;
+            
+            unlockResult := artPThread.Unlock(ch.mutex);
+            (* Note: We preserve success even if unlock fails, as the close operation *)
+            (* itself succeeded. Unlock failure indicates a system problem. *)
+        ELSIF (lockResult = artPThread.OwnerDead) OR (lockResult = artPThread.NotRecoverable) THEN
+            (* Fatal mutex errors - cannot proceed, but also cannot recover *)
+            success := FALSE
         ELSE
-            (* Lock failure *)
+            (* Other lock failures (deadlock, invalid handle, etc.) *)
+            success := FALSE
         END
     END;
-    RETURN ok
+    RETURN success
 END Close;
 
 (** Lock free check to test if buffered channel is closed. 
@@ -125,72 +129,82 @@ BEGIN
     RETURN result
 END IsClosed;
 
-(** Non-blocking send - returns TRUE if message was sent, FALSE if buffer full or error*)
+(** Non-blocking send - returns TRUE if message was sent, FALSE if buffer full or error *)
 PROCEDURE TrySend*(ch: BufferedChannel; item: Collections.ItemPtr): BOOLEAN;
-VAR result, ok: BOOLEAN;
+VAR success: BOOLEAN; tryLockResult, unlockResult: INTEGER;
 BEGIN
-    result := FALSE;
+    success := FALSE;
     IF (ch # NIL) & (item # NIL) & (ch.mutex # NIL) THEN
-        ok := artPThread.Ok = artPThread.TryLock(ch.mutex);
-        IF ok THEN
+        tryLockResult := artPThread.TryLock(ch.mutex);
+        IF tryLockResult = artPThread.Ok THEN
             IF (ch.state = OPEN) & (Queue.Count(ch.buffer) < ch.capacity) THEN
                 Queue.Enqueue(ch.buffer, item);
-                ok := artPThread.Ok = artPThread.Signal(ch.recvCond);
-                (* Signal failure doesn't prevent successful send *)
-                result := TRUE
+                (* Signal failure doesn't prevent successful send - ignore result *)
+                tryLockResult := artPThread.Signal(ch.recvCond);
+                success := TRUE
             END;
-            ok := artPThread.Ok = artPThread.Unlock(ch.mutex);
-            IF ~ok THEN
-                (* Unlock failure is critical - we cannot continue safely *)
-                result := FALSE
-            END
+            unlockResult := artPThread.Unlock(ch.mutex);
+            (* Preserve success state even if unlock fails *)
+        ELSIF tryLockResult = artPThread.Busy THEN
+            (* Mutex busy - this is expected for non-blocking operation *)
+            success := FALSE
+        ELSE
+            (* Other failures (invalid handle, owner dead, etc.) *)
+            success := FALSE
         END
     END;
-    RETURN result
+    RETURN success
 END TrySend;
 
 (** Non-blocking receive - returns TRUE if message received, FALSE if buffer empty or error *)
 PROCEDURE TryReceive*(ch: BufferedChannel; VAR item: Collections.ItemPtr): BOOLEAN;
-VAR result, ok: BOOLEAN;
+VAR success: BOOLEAN; tryLockResult, unlockResult: INTEGER;
 BEGIN
-    result := FALSE;
+    success := FALSE;
     item := NIL;
-    (* You can receive from a closed channel as long as there is data in it 
-    - hence no state check here.*)
+    (* You can receive from a closed channel as long as there is data in it *)
     IF (ch # NIL) & (ch.mutex # NIL) THEN
-        ok := artPThread.Ok = artPThread.TryLock(ch.mutex);
-        IF ok THEN
+        tryLockResult := artPThread.TryLock(ch.mutex);
+        IF tryLockResult = artPThread.Ok THEN
             IF Queue.Count(ch.buffer) > 0 THEN
                 Queue.Dequeue(ch.buffer, item);
-                ok := artPThread.Ok = artPThread.Signal(ch.sendCond);
-                (* Signal failure doesn't prevent successful receive *)
-                result := TRUE
+                (* Signal failure doesn't prevent successful receive - ignore result *)
+                tryLockResult := artPThread.Signal(ch.sendCond);
+                success := TRUE
             END;
-            ok := artPThread.Ok = artPThread.Unlock(ch.mutex);
-            IF ~ok THEN
-                (* Unlock failure is critical - we cannot continue safely *)
-                result := FALSE
-            END
+            unlockResult := artPThread.Unlock(ch.mutex);
+            (* Preserve success state even if unlock fails *)
+        ELSIF tryLockResult = artPThread.Busy THEN
+            (* Mutex busy - this is expected for non-blocking operation *)
+            success := FALSE
+        ELSE
+            (* Other failures (invalid handle, owner dead, etc.) *)
+            success := FALSE
         END
     END;
-    RETURN result
+    RETURN success
 END TryReceive;
 
-(** Blocking send - waits until message can be sent or buffered channel is closed *)
+(** Blocking send - waits until message can be sent or buffered channel is closed 
+    Returns TRUE if message was successfully sent, FALSE on failure or channel closed *)
 PROCEDURE Send*(ch: BufferedChannel; item: Collections.ItemPtr) : BOOLEAN;
-VAR done, ok, canProceed, haveMutex: BOOLEAN;
+VAR done, success, canProceed, haveMutex: BOOLEAN; lockResult, waitResult, unlockResult: INTEGER;
 BEGIN
-    ok := FALSE;
+    success := FALSE;
     done := FALSE;
     haveMutex := FALSE;
     canProceed := (item # NIL) & (ch # NIL);
     
     IF canProceed & (ch.mutex # NIL) THEN
-        ok := artPThread.Ok = artPThread.Lock(ch.mutex);
-        haveMutex := ok;
-        IF ok THEN
-            canProceed := ch.state = OPEN;
+        lockResult := artPThread.Lock(ch.mutex);
+        IF lockResult = artPThread.Ok THEN
+            haveMutex := TRUE;
+            canProceed := ch.state = OPEN
+        ELSIF (lockResult = artPThread.OwnerDead) OR (lockResult = artPThread.NotRecoverable) THEN
+            (* Fatal mutex errors - cannot proceed safely *)
+            canProceed := FALSE
         ELSE
+            (* Other lock failures (deadlock, invalid handle, etc.) *)
             canProceed := FALSE
         END
     END;
@@ -202,74 +216,108 @@ BEGIN
         ELSIF Queue.Count(ch.buffer) < ch.capacity THEN
             (* Buffer has space - send the message *)
             Queue.Enqueue(ch.buffer, item);
-            ok := artPThread.Ok = artPThread.Signal(ch.recvCond);
-            (* Signal failure is recoverable - ignore *)
+            (* Signal receivers - failure is recoverable, operation still succeeded *)
+            waitResult := artPThread.Signal(ch.recvCond);
+            success := TRUE;
             done := TRUE
         ELSE
             (* Buffer full - wait for space to become available *)
-            (* Note: Wait may fail due to signals (EINTR) or other recoverable errors.
-               We continue waiting unless we detect a fatal error pattern. *)
-            ok := artPThread.Ok = artPThread.Wait(ch.sendCond, ch.mutex);
-            (* After wait, re-check all conditions in next loop iteration.
-               Even if wait failed due to signal interruption, we should retry
-               as this is a blocking operation. Only exit on channel closure. *)
+            waitResult := artPThread.Wait(ch.sendCond, ch.mutex);
+            IF waitResult = artPThread.Ok THEN
+                (* Successful wait - continue loop to re-check conditions *)
+                (* Note: Spurious wakeups are handled by re-evaluating loop conditions *)
+            ELSIF (waitResult = artPThread.OwnerDead) OR (waitResult = artPThread.NotRecoverable) THEN
+                (* Fatal mutex state errors - cannot continue safely *)
+                canProceed := FALSE;
+                (* Note: haveMutex remains TRUE as we still need to attempt unlock *)
+                (* even though the mutex may be in an inconsistent state *)
+            ELSIF waitResult = artPThread.NotOwner THEN
+                (* Programming error - should not happen if implementation is correct *)
+                canProceed := FALSE
+            ELSE
+                (* Other wait failures - may be recoverable, continue waiting *)
+                (* This handles interruptions and other transient errors *)
+            END
         END
     END;
     
-    (* Always unlock if we have the mutex, regardless of how we got here *)
+    (* Always attempt unlock if we acquired the mutex *)
     IF haveMutex THEN
-        ok := artPThread.Ok = artPThread.Unlock(ch.mutex);
-        (* Unlock failure is critical but we have no way to report it *)
+        unlockResult := artPThread.Unlock(ch.mutex);
+        (* Note: Even if unlock fails, we preserve the success state of the send operation *)
+        (* Unlock failure indicates a serious system problem but doesn't invalidate *)
+        (* a successful message send that already occurred *)
     END;
-    RETURN ok
+    
+    RETURN success
 END Send;
 
-(** Blocking receive - waits until message available or buffered channel closed and empty *)
+(** Blocking receive - waits until message available or buffered channel closed and empty 
+    Returns TRUE if message was successfully received, FALSE on failure or channel closed and empty *)
 PROCEDURE Receive*(ch: BufferedChannel; VAR item: Collections.ItemPtr) : BOOLEAN;
-VAR done, ok, canProceed, haveMutex: BOOLEAN;
+VAR done, success, canProceed, haveMutex: BOOLEAN; lockResult, waitResult, unlockResult: INTEGER;
 BEGIN
-    ok := FALSE;
+    success := FALSE;
     done := FALSE;
     item := NIL;
     haveMutex := FALSE;
-    (* You can receive from a closed channel as long as there is data in it 
-    - hence no state check here.*)
+    (* You can receive from a closed channel as long as there is data in it *)
     canProceed := (ch # NIL);
     
     IF canProceed & (ch.mutex # NIL) THEN
-        ok := artPThread.Ok = artPThread.Lock(ch.mutex);
-        haveMutex := ok;
-        canProceed := ok
+        lockResult := artPThread.Lock(ch.mutex);
+        IF lockResult = artPThread.Ok THEN
+            haveMutex := TRUE
+        ELSIF (lockResult = artPThread.OwnerDead) OR (lockResult = artPThread.NotRecoverable) THEN
+            (* Fatal mutex errors - cannot proceed safely *)
+            canProceed := FALSE
+        ELSE
+            (* Other lock failures (deadlock, invalid handle, etc.) *)
+            canProceed := FALSE
+        END
     END;
     
     WHILE canProceed & ~done DO
         IF Queue.Count(ch.buffer) > 0 THEN
             (* Buffer has data - receive the message *)
             Queue.Dequeue(ch.buffer, item);
-            ok := artPThread.Ok = artPThread.Signal(ch.sendCond);
-            (* Signal failure is recoverable - ignore *)
+            (* Signal senders - failure is recoverable, operation still succeeded *)
+            waitResult := artPThread.Signal(ch.sendCond);
+            success := TRUE;
             done := TRUE
         ELSIF ch.state = CLOSED THEN
             (* Channel closed and buffer empty - exit without receiving *)
             done := TRUE
         ELSE
             (* Buffer empty and channel open - wait for data *)
-            (* Note: Wait may fail due to signals (EINTR) or other recoverable errors.
-               We continue waiting unless the channel is closed. Wait automatically 
-               unlocks mutex, waits, then re-locks on wake. *)
-            ok := artPThread.Ok = artPThread.Wait(ch.recvCond, ch.mutex);
-            (* After wait, re-check all conditions in next loop iteration.
-               Even if wait failed due to signal interruption, we should retry
-               as this is a blocking operation. Only exit on channel closure. *)
+            waitResult := artPThread.Wait(ch.recvCond, ch.mutex);
+            IF waitResult = artPThread.Ok THEN
+                (* Successful wait - continue loop to re-check conditions *)
+                (* Note: Spurious wakeups are handled by re-evaluating loop conditions *)
+            ELSIF (waitResult = artPThread.OwnerDead) OR (waitResult = artPThread.NotRecoverable) THEN
+                (* Fatal mutex state errors - cannot continue safely *)
+                canProceed := FALSE;
+                (* Note: haveMutex remains TRUE as we still need to attempt unlock *)
+                (* even though the mutex may be in an inconsistent state *)
+            ELSIF waitResult = artPThread.NotOwner THEN
+                (* Programming error - should not happen if implementation is correct *)
+                canProceed := FALSE
+            ELSE
+                (* Other wait failures - may be recoverable, continue waiting *)
+                (* This handles interruptions and other transient errors *)
+            END
         END
     END;
     
-    (* Always unlock if we have the mutex, regardless of how we got here *)
+    (* Always attempt unlock if we acquired the mutex *)
     IF haveMutex THEN
-        ok := artPThread.Ok = artPThread.Unlock(ch.mutex);
-        (* Unlock failure is critical but we have no way to report it *)
+        unlockResult := artPThread.Unlock(ch.mutex);
+        (* Note: Even if unlock fails, we preserve the success state of the receive operation *)
+        (* Unlock failure indicates a serious system problem but doesn't invalidate *)
+        (* a successful message receive that already occurred *)
     END;
-    RETURN ok
+    
+    RETURN success
 END Receive;
 
 END BufferedChannels.
