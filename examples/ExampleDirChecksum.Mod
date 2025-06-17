@@ -13,13 +13,13 @@
 *)
 MODULE ExampleDirChecksum;
 
-IMPORT Out, extArgs, artDirent, Channels := BufferedChannels, Chars, Collections, Files, CRC32, Threads;
+IMPORT Out, extArgs, artDirent, Channels := BufferedChannels, Chars, Collections, Files, CRC32, Threads, artPThread;
 
 CONST
     UsageMsg = "Usage: ExampleDirChecksum <directory>";
     MaxNameLen = 256;
-    FileJobBufSize = 16;
-    ResultBufSize = 16;
+    FileJobBufSize = 2;   (* Reduced to force contention *)
+    ResultBufSize = 2;    (* Reduced to force contention *)
     NumWorkers = 2;
     ReadBufSize = 4096;
 
@@ -41,8 +41,38 @@ VAR
     res: INTEGER;
     fileJobChan, resultChan: Channels.BufferedChannel;
     fileCount: INTEGER;
-    worker1, worker2 : Threads.Thread;
-    ok : BOOLEAN;
+    worker1, worker2, collector : Threads.Thread;
+    ok, debugMode: BOOLEAN;
+    (* The allocator in obnc is probably not thread-safe - we try to play nice here. *)
+    printMutex : artPThread.Mutex;
+
+(* Thread-safe debug logging *)
+PROCEDURE DebugLog(msg: ARRAY OF CHAR);
+VAR ok: BOOLEAN;
+BEGIN
+    IF debugMode THEN
+        (* ok := artPThread.Lock(printMutex); *)
+        (* Out.String("[DEBUG] "); Out.String(msg); Out.Ln; *)
+        (* ok := artPThread.Unlock(printMutex) *)
+    END
+END DebugLog;
+
+PROCEDURE PrintResult(result : FileResult);
+VAR ok: BOOLEAN;
+BEGIN
+    ok := artPThread.Ok = artPThread.Lock(printMutex);
+    Out.String("[INFO] "); 
+        Out.String(result.name);
+        Out.String(" ");
+        IF result.success THEN
+            Out.Hex(result.checksum)
+        ELSE
+            Out.String("?")
+        END;
+        Out.Ln;
+    ok := artPThread.Ok = artPThread.Unlock(printMutex)
+END PrintResult;
+
 
 PROCEDURE WorkerThread();
 VAR
@@ -54,41 +84,53 @@ VAR
     buffer: ARRAY ReadBufSize OF BYTE;
     bytesRead, i: INTEGER;
     calc: CRC32.Calculator;
-    hasJob: BOOLEAN;
+    jobsProcessed: INTEGER;
+    ok : BOOLEAN;
 BEGIN
+    jobsProcessed := 0;
     REPEAT
-        hasJob := Channels.TryReceive(fileJobChan, jobItem);
-        IF hasJob & (jobItem # NIL) THEN
-            job := jobItem(FileJob);
-            NEW(result);
-            result.name[0] := 0X;
-            Chars.Append(job.name, result.name);
-            
-            file := Files.Old(job.name);
-            IF file # NIL THEN
-                Files.Set(rider, file, 0);
-                calc := CRC32.NewCalculator();
-                CRC32.Init(calc);
+        ok := Channels.Receive(fileJobChan, jobItem);
+        IF jobItem # NIL THEN
+            IF jobItem IS FileJob THEN
+                job := jobItem(FileJob);
+                NEW(result);
+                result.name[0] := 0X;
+                Chars.Append(job.name, result.name);
                 
-                WHILE ~rider.eof DO
-                    Files.ReadBytes(rider, buffer, ReadBufSize);
-                    bytesRead := ReadBufSize - rider.res;
-                    FOR i := 0 TO bytesRead - 1 DO
-                        CRC32.UpdateByte(calc, buffer[i])
-                    END
+                file := Files.Old(job.name);
+                IF file # NIL THEN
+                    Files.Set(rider, file, 0);
+                    calc := CRC32.NewCalculator();
+                    CRC32.Init(calc);
+                    
+                    WHILE ~rider.eof DO
+                        Files.ReadBytes(rider, buffer, ReadBufSize);
+                        bytesRead := ReadBufSize - rider.res;
+                        FOR i := 0 TO bytesRead - 1 DO
+                            CRC32.UpdateByte(calc, buffer[i])
+                        END
+                    END;
+                    
+                    result.success := TRUE;
+                    result.checksum := CRC32.Finalize(calc);
+                    Files.Close(file)
+                ELSE
+                    result.success := FALSE;
+                    result.checksum := 0
                 END;
                 
-                result.success := TRUE;
-                result.checksum := CRC32.Finalize(calc);
-                Files.Close(file)
+                ok := Channels.Send(resultChan, result);
+                jobsProcessed := jobsProcessed + 1
             ELSE
-                result.success := FALSE;
-                result.checksum := 0
-            END;
-            
-            Channels.Send(resultChan, result)
+                IF debugMode THEN
+                    DebugLog("[W2] Received non-FileJob item!");
+                END
+            END
         END
-    UNTIL ~hasJob & Channels.IsClosed(fileJobChan)
+    UNTIL jobItem = NIL;
+    IF debugMode THEN
+        DebugLog("[W] Finished, processed jobs.");
+    END
 END WorkerThread;
 
 PROCEDURE ScanDirectory(path: ARRAY OF CHAR; chan: Channels.BufferedChannel);
@@ -97,7 +139,6 @@ VAR
     name: ARRAY MaxNameLen OF CHAR;
     isDir: BOOLEAN;
     job: FileJob;
-    ok: BOOLEAN;
 BEGIN
     fileCount := 0;
     scanner := artDirent.OpenScanner(path);
@@ -108,77 +149,115 @@ BEGIN
                 NEW(job);
                 job.name[0] := 0X;
                 Chars.Append(name, job.name);
-                Channels.Send(chan, job);
-                Out.String("Queued file: "); Out.String(name); Out.Ln;
+                ok := Channels.Send(chan, job);
                 fileCount := fileCount + 1
             END;
             ok := artDirent.NextEntry(scanner, name, isDir)
         END;
         artDirent.CloseScanner(scanner)
     ELSE
-        Out.String("Failed to open directory: "); Out.String(path); Out.Ln
+        (* DebugLog("Failed to open directory: "); *)
     END
 END ScanDirectory;
 
-PROCEDURE PrintResults(resChan: Channels.BufferedChannel; expectedCount: INTEGER);
+(* Add this procedure to monitor channel states *)
+PROCEDURE CheckChannelStates();
+VAR ok: BOOLEAN;
+BEGIN
+    ok := artPThread.Ok = artPThread.Lock(printMutex);
+    Out.String("[CHAN] fileJobChan closed: ");
+    IF Channels.IsClosed(fileJobChan) THEN
+        Out.String("YES")
+    ELSE
+        Out.String("NO")
+    END;
+    Out.String(", resultChan closed: ");
+    IF Channels.IsClosed(resultChan) THEN
+        Out.String("YES")
+    ELSE
+        Out.String("NO")
+    END;
+    Out.Ln;
+    ok := artPThread.Ok = artPThread.Unlock(printMutex)
+END CheckChannelStates;
+
+PROCEDURE ResultCollectorThread();
 VAR
     resultItem: Collections.ItemPtr;
     result: FileResult;
     count: INTEGER;
-    hasResult: BOOLEAN;
+    ok: BOOLEAN;
 BEGIN
     count := 0;
-    WHILE count < expectedCount DO
-        hasResult := Channels.TryReceive(resChan, resultItem);
-        IF hasResult & (resultItem # NIL) THEN
-            result := resultItem(FileResult);
-            Out.String(result.name);
-            Out.String(" ");
-            IF result.success THEN
-                Out.Hex(result.checksum)
+    REPEAT
+        ok := Channels.Receive(resultChan, resultItem);
+        IF resultItem # NIL THEN
+            IF resultItem IS FileResult THEN
+                result := resultItem(FileResult);
+                PrintResult(result);
+                count := count + 1
             ELSE
-                Out.String("?")
-            END;
-            Out.Ln;
-            count := count + 1
+                DebugLog("Error: Received non-FileResult item in resultChan");
+            END
         END
-        (* Small delay to avoid busy waiting *)
-    END
-END PrintResults;
+    UNTIL resultItem = NIL;
+    DebugLog("Collected results"); 
+END ResultCollectorThread;
 
 BEGIN
+
     IF extArgs.count < 1 THEN
         Out.String(UsageMsg); Out.Ln
     ELSE
         extArgs.Get(0, dir, res);
-        Out.String("Scanning directory: "); Out.String(dir); Out.Ln;
+        (* DebugLog("Scanning directory..."); *)
         
-        (* Set up channels *)
+        (* Enable debug mode for stress testing *)
+        debugMode := TRUE;
+        printMutex := artPThread.NewMutex();
+        
+        (* DebugLog("Initializing channels..."); *)
+        
+        (* Set up channels with small buffers to force contention *)
         fileJobChan := Channels.NewChannel(FileJobBufSize);
         resultChan := Channels.NewChannel(ResultBufSize);
         
-        (* Scan directory and queue jobs first *)
-        Out.String("Scanning files..."); Out.Ln;
-        ScanDirectory(dir, fileJobChan);
-        Out.String("Found "); Out.Int(fileCount, 0); Out.String(" files"); Out.Ln;
+        (* DebugLog("Channels created successfully"); *)
         
-        (* Start worker threads *)
-        Out.String("Starting "); Out.Int(NumWorkers, 0); Out.String(" worker threads..."); Out.Ln;
+        (* Start worker threads AND result collector BEFORE queuing jobs *)
+        (* DebugLog("Starting worker threads..."); Out.Ln; *)
         worker1 := Threads.NewThread(WorkerThread);
         worker2 := Threads.NewThread(WorkerThread);
         
+        (* DebugLog("Starting result collector thread..."); *)
+        collector := Threads.NewThread(ResultCollectorThread);
+        
+        (* Now scan directory and queue jobs *)
+        (* DebugLog("Scanning files..."); *)
+        ScanDirectory(dir, fileJobChan);
+        (* DebugLog("Found files"); *)
+        
         (* Close job channel to signal workers to finish *)
-        Channels.Close(fileJobChan);
+        ok := Channels.Close(fileJobChan);
         
         (* Wait for workers to complete *)
-        Out.String("Waiting for workers to complete..."); Out.Ln;
+        (* DebugLog("Waiting for workers to complete..."); *)
+        (* CheckChannelStates(); *)
+
         ok := Threads.JoinThread(worker1);
+        (* DebugLog("Worker 1 joined"); *)
         ok := Threads.JoinThread(worker2);
+        (* DebugLog("Worker 2 joined"); *)
         
-        (* Collect and print results *)
-        Out.String("Collecting results..."); Out.Ln;
-        PrintResults(resultChan, fileCount);
-        
-        Out.String("Processing complete."); Out.Ln
+        (* Close result channel to signal collector to finish *)
+        ok := Channels.Close(resultChan);
+        (* CheckChannelStates(); *)
+
+        (* Wait for collector to finish *)
+        (* DebugLog("Waiting for result collector to complete...");  *)
+        ok := Threads.JoinThread(collector);
+        (* DebugLog("Collector joined"); *)
+
+        (* DebugLog("Processing complete."); *)
     END
 END ExampleDirChecksum.

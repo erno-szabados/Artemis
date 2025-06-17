@@ -28,14 +28,14 @@ END NewMessage;
 PROCEDURE TestBufferedChannelCreation*(): BOOLEAN;
 VAR 
     ch: BufferedChannels.BufferedChannel;
-    pass: BOOLEAN;
+    ok, pass: BOOLEAN;
 BEGIN
     pass := TRUE;
     ch := BufferedChannels.NewChannel(0);
     Tests.ExpectedBool(FALSE, BufferedChannels.IsClosed(ch), "New buffered channel should be open", pass);
     ch := BufferedChannels.NewChannel(5);
     Tests.ExpectedBool(FALSE, BufferedChannels.IsClosed(ch), "New buffered channel should be open", pass);
-    BufferedChannels.Close(ch);
+    ok := BufferedChannels.Close(ch);
     Tests.ExpectedBool(TRUE, BufferedChannels.IsClosed(ch), "Closed buffered channel should report closed", pass);
     RETURN pass
 END TestBufferedChannelCreation;
@@ -146,7 +146,8 @@ BEGIN
     msg := NewMessage(999);
     success := BufferedChannels.TrySend(ch, msg);
     Tests.ExpectedBool(TRUE, success, "Should send before closing", pass);
-    BufferedChannels.Close(ch);
+    success := BufferedChannels.Close(ch);
+    Tests.ExpectedBool(TRUE, success, "Close should succeed", pass);
     success := BufferedChannels.TrySend(ch, NewMessage(888));
     Tests.ExpectedBool(FALSE, success, "Should not send to closed buffered channel", pass);
     success := BufferedChannels.TryReceive(ch, result);

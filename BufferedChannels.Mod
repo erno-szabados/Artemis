@@ -89,11 +89,12 @@ BEGIN
 END NewChannel;
 
 (** Close a buffered channel - no more sends allowed, receives drain remaining messages 
-  If Unlock fails, the error is ignored, as Close does not return a result.  
+  If any thread operation fails, FALSE returned.
  *)
-PROCEDURE Close*(ch: BufferedChannel);
+PROCEDURE Close*(ch: BufferedChannel) : BOOLEAN;
 VAR ok: BOOLEAN;
 BEGIN
+    ok := FALSE;
     IF (ch # NIL) & (ch.mutex # NIL) THEN
         ok := artPThread.Ok = artPThread.Lock(ch.mutex);
         IF ok THEN
@@ -109,7 +110,8 @@ BEGIN
         ELSE
             (* Lock failure *)
         END
-    END
+    END;
+    RETURN ok
 END Close;
 
 (** Lock free check to test if buffered channel is closed. 
@@ -175,9 +177,10 @@ BEGIN
 END TryReceive;
 
 (** Blocking send - waits until message can be sent or buffered channel is closed *)
-PROCEDURE Send*(ch: BufferedChannel; item: Collections.ItemPtr);
+PROCEDURE Send*(ch: BufferedChannel; item: Collections.ItemPtr) : BOOLEAN;
 VAR done, ok, canProceed, haveMutex: BOOLEAN;
 BEGIN
+    ok := FALSE;
     done := FALSE;
     haveMutex := FALSE;
     canProceed := (item # NIL) & (ch # NIL);
@@ -217,13 +220,15 @@ BEGIN
     IF haveMutex THEN
         ok := artPThread.Ok = artPThread.Unlock(ch.mutex);
         (* Unlock failure is critical but we have no way to report it *)
-    END
+    END;
+    RETURN ok
 END Send;
 
 (** Blocking receive - waits until message available or buffered channel closed and empty *)
-PROCEDURE Receive*(ch: BufferedChannel; VAR item: Collections.ItemPtr);
+PROCEDURE Receive*(ch: BufferedChannel; VAR item: Collections.ItemPtr) : BOOLEAN;
 VAR done, ok, canProceed, haveMutex: BOOLEAN;
 BEGIN
+    ok := FALSE;
     done := FALSE;
     item := NIL;
     haveMutex := FALSE;
@@ -263,7 +268,8 @@ BEGIN
     IF haveMutex THEN
         ok := artPThread.Ok = artPThread.Unlock(ch.mutex);
         (* Unlock failure is critical but we have no way to report it *)
-    END
+    END;
+    RETURN ok
 END Receive;
 
 END BufferedChannels.

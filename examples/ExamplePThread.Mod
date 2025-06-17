@@ -42,9 +42,9 @@ BEGIN
     arg := SYSTEM.VAL(ThreadArg, context);
     IF arg # NIL THEN
         FOR j := 0 TO arg.increments - 1 DO
-            IF artPThread.Lock(arg.ctx.mutex) THEN
+            IF artPThread.Ok = artPThread.Lock(arg.ctx.mutex) THEN
                 arg.ctx.counter := arg.ctx.counter + 1;
-                ok := artPThread.Unlock(arg.ctx.mutex)
+                ok := artPThread.Ok = artPThread.Unlock(arg.ctx.mutex)
             END;
             artPThread.Sleep(ThreadSleepMs)
         END
@@ -70,7 +70,7 @@ BEGIN
         END;
         FOR i := 0 TO NumThreads - 1 DO
             IF threads[i] # NIL THEN
-                IF ~artPThread.Join(threads[i]) THEN
+                IF artPThread.Ok # artPThread.Join(threads[i]) THEN
                     Out.String("Failed to join thread "); Out.Int(i, 0); Out.Ln
                 END
             END

@@ -92,17 +92,38 @@ END NewThreadProcEntry;
     a safe integer ID that can be passed to C functions.
 *)
 PROCEDURE RegisterThreadProc(proc: ThreadProc): INTEGER;
-VAR registryId: INTEGER; result: INTEGER; entry: ThreadProcEntry;
+VAR registryId: INTEGER; result: INTEGER; entry: ThreadProcEntry; success: BOOLEAN;
 BEGIN
-    registryId := -1;
-    result := artPThread.Lock(registryMutex);
-    IF result = artPThread.Ok THEN
-        registryId := nextRegistryId;
-        INC(nextRegistryId);
-        entry := NewThreadProcEntry(proc);
-        HashMap.Put(threadProcRegistry, registryId, entry);
-        result := artPThread.Unlock(registryMutex)
+    registryId := -1;  (* Default to failure *)
+    success := FALSE;
+    
+    (* Validate input *)
+    IF proc # NIL THEN
+        result := artPThread.Lock(registryMutex);
+        IF result = artPThread.Ok THEN
+            (* Integer overflow before incrementing is unchecked 
+            - we cannot now the underlying integer type because it is OBNC configuration dependent.*)
+        
+            registryId := nextRegistryId;
+            INC(nextRegistryId);
+            
+            (* Create registry entry *)
+            entry := NewThreadProcEntry(proc);
+            IF entry # NIL THEN
+                (* Attempt to store in registry - Put has no return value. *)
+                HashMap.Put(threadProcRegistry, registryId, entry);
+            ELSE
+                (* Memory allocation failed for entry *)
+                registryId := -1
+            END;
+            
+            (* Always attempt to unlock, even if registration failed *)
+            result := artPThread.Unlock(registryMutex)
+            (* Note: We don't invalidate a successful registration even if unlock fails *)
+            (* The mutex implementation should handle this gracefully *)
+        END
     END;
+    
     RETURN registryId
 END RegisterThreadProc;
 
