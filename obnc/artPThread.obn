@@ -8,6 +8,19 @@
 *)
 MODULE artPThread;
 
+CONST
+    Ok* = 0;  (** Operation successful *)
+    InvalidHandle* = 1;  (** Invalid handle or pointer *)
+    Deadlock* = 2;  (** Deadlock detected *)
+    ResourceExhausted* = 3;  (** Out of resources *)
+    NotOwner* = 4;  (** Not owner of mutex *)
+    Busy* = 5;  (** Resource busy *)
+    MaxRecursion* = 7;      (** Maximum recursion exceeded (EAGAIN) *)
+    NotRecoverable* = 8;    (** State not recoverable (ENOTRECOVERABLE) *)
+    OwnerDead* = 9;         (** Previous owner died (EOWNERDEAD) *)
+    Timeout* = 10;          (** Timed out (ETIMEDOUT, for condvar timed wait) *)
+    UnknownError* = 100;  (** Unknown or unexpected error *)
+
 TYPE
     (** Opaque mutex type *)
     Mutex* = POINTER TO MutexDesc;
@@ -30,7 +43,6 @@ TYPE
     (** Pointer to a Thread Procedure, taking a SYSTEM.ADR and returning a SYSTEM.ADR void* -> void* *)
     ThreadProc* = PROCEDURE(contextPtr: INTEGER): INTEGER;
 
-
 (** Create a new mutex *)
 PROCEDURE NewMutex*(): Mutex;
 BEGIN
@@ -44,25 +56,28 @@ BEGIN
     (* Formal body, C implementation takes precedence. *)
 END FreeMutex;
 
-(** Lock a mutex (blocking) *)
-PROCEDURE Lock*(mutex: Mutex): BOOLEAN;
+(** Lock a mutex (blocking)
+    Returns Ok, Deadlock, InvalidHandle, or UnknownError. *)
+PROCEDURE Lock*(mutex: Mutex): INTEGER;
 BEGIN
     (* Formal body, C implementation takes precedence. *)
-    RETURN FALSE
+    RETURN UnknownError
 END Lock;
 
-(** Unlock a mutex *)
-PROCEDURE Unlock*(mutex: Mutex): BOOLEAN;
+(** Unlock a mutex
+    Returns Ok, NotOwner, InvalidHandle, or UnknownError. *)
+PROCEDURE Unlock*(mutex: Mutex): INTEGER;
 BEGIN
     (* Formal body, C implementation takes precedence. *)
-    RETURN FALSE
+    RETURN UnknownError
 END Unlock;
 
-(** Try to lock a mutex (non-blocking) *)
-PROCEDURE TryLock*(mutex: Mutex): BOOLEAN;
+(** Try to lock a mutex (non-blocking)
+    Returns Ok, Busy, InvalidHandle, or UnknownError. *)
+PROCEDURE TryLock*(mutex: Mutex): INTEGER;
 BEGIN
     (* Formal body, C implementation takes precedence. *)
-    RETURN FALSE
+    RETURN UnknownError
 END TryLock;
 
 (** Create a new condition variable *)
@@ -78,25 +93,28 @@ BEGIN
     (* Formal body, C implementation takes precedence. *)
 END FreeCondVar;
 
-(** Wait on a condition variable (releases mutex, reacquires on wake) *)
-PROCEDURE Wait*(cv: CondVar; mutex: Mutex): BOOLEAN;
+(** Wait on a condition variable (releases mutex, reacquires on wake)
+    Returns Ok, InvalidHandle, or UnknownError. *)
+PROCEDURE Wait*(cv: CondVar; mutex: Mutex): INTEGER;
 BEGIN
     (* Formal body, C implementation takes precedence. *)
-    RETURN FALSE
+    RETURN UnknownError
 END Wait;
 
-(** Signal one waiting thread *)
-PROCEDURE Signal*(cv: CondVar): BOOLEAN;
+(** Signal one waiting thread
+    Returns Ok, InvalidHandle, or UnknownError. *)
+PROCEDURE Signal*(cv: CondVar): INTEGER;
 BEGIN
     (* Formal body, C implementation takes precedence. *)
-    RETURN FALSE
+    RETURN UnknownError
 END Signal;
 
-(** Signal all waiting threads *)
-PROCEDURE Broadcast*(cv: CondVar): BOOLEAN;
+(** Signal all waiting threads
+    Returns Ok, InvalidHandle, or UnknownError. *)
+PROCEDURE Broadcast*(cv: CondVar): INTEGER;
 BEGIN
     (* Formal body, C implementation takes precedence. *)
-    RETURN FALSE
+    RETURN UnknownError
 END Broadcast;
 
 (** Create a new thread *)
@@ -106,11 +124,12 @@ BEGIN
     RETURN NIL
 END NewThread;
 
-(** Wait for thread to finish *)
-PROCEDURE Join*(thread: Thread): BOOLEAN;
+(** Wait for thread to finish
+    Returns Ok, InvalidHandle, or UnknownError. *)
+PROCEDURE Join*(thread: Thread): INTEGER;
 BEGIN
     (* Formal body, C implementation takes precedence. *)
-    RETURN FALSE
+    RETURN UnknownError
 END Join;
 
 (** Sleep for milliseconds *)

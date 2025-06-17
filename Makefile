@@ -8,7 +8,6 @@ BUILD_NAME = Artemis-Modules
 PROG_NAMES = #$(shell ls -1 *CmdLn.Mod | sed -E 's/CmdLn\.Mod')
 TEST_NAMES = $(shell ls -1 *Test.Mod | sed -E 's/\.Mod//g' )
 EXAMPLE_NAMES = $(shell ls -1 examples/*.Mod | sed -E 's/examples\/(.*)\.Mod/\1/g' )
-EXAMPLE_NAMES = $(shell ls -1 examples/*.Mod | sed -E 's/examples\/(.*)\.Mod/\1/g' )
 MODULES = $(shell ls -1 *.Mod)
 DOCS= codemeta.json CITATION.cff README.md LICENSE INSTALL.txt
 HTML_FILES=$(shell find . -type f | grep -E '.html')
@@ -68,8 +67,6 @@ ifneq ($(bindir),)
 endif
 
 build: $(TEST_NAMES) # $(PROG_NAMES)
-
-examples: $(EXAMPLE_NAMES)
 
 examples: $(EXAMPLE_NAMES)
 

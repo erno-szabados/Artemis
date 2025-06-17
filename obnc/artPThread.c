@@ -73,24 +73,24 @@ void artPThread__FreeMutex_(artPThread__Mutex_ *mutex_)
 int artPThread__Lock_(artPThread__Mutex_ mutex_)
 {
 	pthread_mutex_t *pmutex;
-	
 	if (mutex_ == NULL) {
-		return 0; /* FALSE - invalid mutex */
+		return artPThread__InvalidHandle_
+; /* FALSE - invalid mutex */
 	}
-	
-	/* Get the pthread_mutex_t pointer from handle */
 	pmutex = (pthread_mutex_t *)(uintptr_t)mutex_->handle_;
-	
 	if (pmutex == NULL) {
-		return 0; /* FALSE - invalid handle */
+		return artPThread__InvalidHandle_
+; /* FALSE - invalid handle */
 	}
-	
-	/* Lock the mutex */
-	if (pthread_mutex_lock(pmutex) == 0) {
-		return 1; /* TRUE - success */
-	} else {
-		return 0; /* FALSE - lock failed */
-	}
+	int r = pthread_mutex_lock(pmutex);
+	if (r == 0) return artPThread__Ok_;
+	if (r == EDEADLK) return artPThread__Deadlock_;
+	if (r == EINVAL) return artPThread__InvalidHandle_
+;
+	if (r == EAGAIN) return artPThread__MaxRecursion_;
+	if (r == ENOTRECOVERABLE) return artPThread__NotRecoverable_;
+	if (r == EOWNERDEAD) return artPThread__OwnerDead_;
+	return artPThread__UnknownError_;
 }
 
 
@@ -99,46 +99,49 @@ int artPThread__Unlock_(artPThread__Mutex_ mutex_)
 	pthread_mutex_t *pmutex;
 	
 	if (mutex_ == NULL) {
-		return 0; /* FALSE - invalid mutex */
+		return artPThread__InvalidHandle_
+; /* FALSE - invalid mutex */
 	}
 	
 	/* Get the pthread_mutex_t pointer from handle */
 	pmutex = (pthread_mutex_t *)(uintptr_t)mutex_->handle_;
 	
 	if (pmutex == NULL) {
-		return 0; /* FALSE - invalid handle */
+		return artPThread__InvalidHandle_
+; /* FALSE - invalid handle */
 	}
 	
 	/* Unlock the mutex */
-	if (pthread_mutex_unlock(pmutex) == 0) {
-		return 1; /* TRUE - success */
-	} else {
-		return 0; /* FALSE - unlock failed */
-	}
+	int r = pthread_mutex_unlock(pmutex);
+	if (r == 0) return artPThread__Ok_;
+	if (r == EPERM) return artPThread__NotOwner_;
+	if (r == EINVAL) return artPThread__InvalidHandle_
+;
+	return artPThread__UnknownError_;
 }
 
 
 int artPThread__TryLock_(artPThread__Mutex_ mutex_)
 {
 	pthread_mutex_t *pmutex;
-
 	if (mutex_ == NULL) {
-		return 0; /* FALSE - invalid mutex */
+		return artPThread__InvalidHandle_
+; /* FALSE - invalid mutex */
 	}
-
-	/* Get the pthread_mutex_t pointer from handle */
 	pmutex = (pthread_mutex_t *)(uintptr_t)mutex_->handle_;
-
 	if (pmutex == NULL) {
-		return 0; /* FALSE - invalid handle */
+		return artPThread__InvalidHandle_
+; /* FALSE - invalid handle */
 	}
-
-	/* Try to lock the mutex (non-blocking) */
-	if (pthread_mutex_trylock(pmutex) == 0) {
-		return 1; /* TRUE - success */
-	} else {
-		return 0; /* FALSE - already locked or error */
-	}
+	int r = pthread_mutex_trylock(pmutex);
+	if (r == 0) return artPThread__Ok_;
+	if (r == EBUSY) return artPThread__Busy_;
+	if (r == EINVAL) return artPThread__InvalidHandle_
+;
+	if (r == EAGAIN) return artPThread__MaxRecursion_;
+	if (r == ENOTRECOVERABLE) return artPThread__NotRecoverable_;
+	if (r == EOWNERDEAD) return artPThread__OwnerDead_;
+	return artPThread__UnknownError_;
 }
 
 
@@ -194,23 +197,24 @@ int artPThread__Wait_(artPThread__CondVar_ cv_, artPThread__Mutex_ mutex_)
 {
 	pthread_cond_t *pcv;
 	pthread_mutex_t *pmutex;
-
 	if (cv_ == NULL || mutex_ == NULL) {
-		return 0; /* FALSE - invalid condvar or mutex */
+		return artPThread__InvalidHandle_
+; /* FALSE - invalid condvar or mutex */
 	}
-
 	pcv = (pthread_cond_t *)(uintptr_t)cv_->handle_;
 	pmutex = (pthread_mutex_t *)(uintptr_t)mutex_->handle_;
-
 	if (pcv == NULL || pmutex == NULL) {
-		return 0; /* FALSE - invalid handle */
+		return artPThread__InvalidHandle_
+; /* FALSE - invalid handle */
 	}
-
-	if (pthread_cond_wait(pcv, pmutex) == 0) {
-		return 1; /* TRUE - success */
-	} else {
-		return 0; /* FALSE - wait failed */
-	}
+	int r = pthread_cond_wait(pcv, pmutex);
+	if (r == 0) return artPThread__Ok_;
+	if (r == EINVAL) return artPThread__InvalidHandle_
+;
+	if (r == ENOTRECOVERABLE) return artPThread__NotRecoverable_;
+	if (r == EOWNERDEAD) return artPThread__OwnerDead_;
+	if (r == EPERM) return artPThread__NotOwner_;
+	return artPThread__UnknownError_;
 }
 
 
@@ -219,20 +223,22 @@ int artPThread__Signal_(artPThread__CondVar_ cv_)
 	pthread_cond_t *pcv;
 
 	if (cv_ == NULL) {
-		return 0; /* FALSE - invalid condvar */
+		return artPThread__InvalidHandle_
+; /* FALSE - invalid condvar */
 	}
 
 	pcv = (pthread_cond_t *)(uintptr_t)cv_->handle_;
 
 	if (pcv == NULL) {
-		return 0; /* FALSE - invalid handle */
+		return artPThread__InvalidHandle_
+; /* FALSE - invalid handle */
 	}
 
-	if (pthread_cond_signal(pcv) == 0) {
-		return 1; /* TRUE - success */
-	} else {
-		return 0; /* FALSE - signal failed */
-	}
+	int r = pthread_cond_signal(pcv);
+	if (r == 0) return artPThread__Ok_;
+	if (r == EINVAL) return artPThread__InvalidHandle_
+;
+	return artPThread__UnknownError_;
 }
 
 
@@ -241,20 +247,22 @@ int artPThread__Broadcast_(artPThread__CondVar_ cv_)
 	pthread_cond_t *pcv;
 
 	if (cv_ == NULL) {
-		return 0; /* FALSE - invalid condvar */
+		return artPThread__InvalidHandle_
+; /* FALSE - invalid condvar */
 	}
 
 	pcv = (pthread_cond_t *)(uintptr_t)cv_->handle_;
 
 	if (pcv == NULL) {
-		return 0; /* FALSE - invalid handle */
+		return artPThread__InvalidHandle_
+; /* FALSE - invalid handle */
 	}
 
-	if (pthread_cond_broadcast(pcv) == 0) {
-		return 1; /* TRUE - success */
-	} else {
-		return 0; /* FALSE - broadcast failed */
-	}
+	int r = pthread_cond_broadcast(pcv);
+	if (r == 0) return artPThread__Ok_;
+	if (r == EINVAL) return artPThread__InvalidHandle_
+;
+	return artPThread__UnknownError_;
 }
 
 
@@ -327,18 +335,24 @@ int artPThread__Join_(artPThread__Thread_ thread_)
 {
 	pthread_t *pth;
 	if (thread_ == NULL) {
-		return 0;
+		return artPThread__InvalidHandle_
+;
 	}
 	pth = (pthread_t *)(uintptr_t)thread_->handle_;
 	if (pth == NULL) {
-		return 0;
+		return artPThread__InvalidHandle_
+;
 	}
-	if (pthread_join(*pth, NULL) == 0) {
+	int r = pthread_join(*pth, NULL);
+	if (r == 0) {
 		free(pth);
 		thread_->handle_ = 0;
-		return 1;
+		return artPThread__Ok_;
+	} else if (r == EINVAL) {
+		return artPThread__InvalidHandle_
+;
 	} else {
-		return 0;
+		return artPThread__UnknownError_;
 	}
 }
 

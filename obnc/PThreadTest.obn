@@ -28,7 +28,7 @@ BEGIN
     
     Out.String("Sleeping for 2 seconds..."); Out.Ln;
     (* Simple test: Sleep should not crash and should take some time *)
-    artPThread.Sleep(2000); (* Sleep for 10 milliseconds *)
+    artPThread.Sleep(2000); 
     
     Clock.Get(c);
     Out.String("  TestSleep (s):"); Out.Int(c.minute, 0); Out.String(":"); Out.Int(c.second, 0); Out.Ln;
@@ -45,8 +45,9 @@ BEGIN
 END TestSleep;
 
 PROCEDURE TestMutex(): BOOLEAN;
-VAR pass, result: BOOLEAN;
+VAR pass: BOOLEAN;
     mutex: artPThread.Mutex;
+    result: INTEGER;
 BEGIN
     pass := TRUE;
     Out.String("  TestMutex...");
@@ -58,30 +59,30 @@ BEGIN
     IF mutex # NIL THEN
         (* Test locking *)
         result := artPThread.Lock(mutex);
-        Tests.ExpectedBool(TRUE, result, "Mutex lock should succeed", pass);
+        Tests.ExpectedInt(artPThread.Ok, result, "Mutex lock should succeed", pass);
         
         (* Test unlocking *)
         result := artPThread.Unlock(mutex);
-        Tests.ExpectedBool(TRUE, result, "Mutex unlock should succeed", pass);
+        Tests.ExpectedInt(artPThread.Ok, result, "Mutex unlock should succeed", pass);
         
         (* Test double lock/unlock *)
         result := artPThread.Lock(mutex);
-        Tests.ExpectedBool(TRUE, result, "Second mutex lock should succeed", pass);
+        Tests.ExpectedInt(artPThread.Ok, result, "Second mutex lock should succeed", pass);
         
         result := artPThread.Unlock(mutex);
-        Tests.ExpectedBool(TRUE, result, "Second mutex unlock should succeed", pass);
+        Tests.ExpectedInt(artPThread.Ok, result, "Second mutex unlock should succeed", pass);
         
         (* Test TryLock on unlocked mutex *)
         result := artPThread.TryLock(mutex);
-        Tests.ExpectedBool(TRUE, result, "TryLock should succeed on unlocked mutex", pass);
+        Tests.ExpectedInt(artPThread.Ok, result, "TryLock should succeed on unlocked mutex", pass);
 
         (* Test TryLock on already locked mutex *)
         result := artPThread.TryLock(mutex);
-        Tests.ExpectedBool(FALSE, result, "TryLock should fail on already locked mutex", pass);
+        Tests.ExpectedInt(artPThread.Busy, result, "TryLock should fail on already locked mutex", pass);
 
         (* Unlock for cleanup *)
         result := artPThread.Unlock(mutex);
-        Tests.ExpectedBool(TRUE, result, "Unlock after TryLock should succeed", pass);
+        Tests.ExpectedInt(artPThread.Ok, result, "Unlock after TryLock should succeed", pass);
         
         (* Clean up *)
         artPThread.FreeMutex(mutex);
@@ -114,9 +115,10 @@ BEGIN
 END TestCondVar;
 
 PROCEDURE TestCondVarWaitSignal(): BOOLEAN;
-VAR pass, ok: BOOLEAN;
+VAR pass: BOOLEAN;
     mutex: artPThread.Mutex;
     cv: artPThread.CondVar;
+    ok: INTEGER;
     signaled: BOOLEAN;
 BEGIN
     pass := TRUE;
@@ -128,18 +130,18 @@ BEGIN
     
     IF (mutex # NIL) & (cv # NIL) THEN
         ok := artPThread.Lock(mutex);
-        Tests.ExpectedBool(TRUE, ok, "Lock before wait should succeed", pass);
+        Tests.ExpectedInt(artPThread.Ok, ok, "Lock before wait should succeed", pass);
         
         (* In a real test, another thread would Signal. Here, we just check that Wait returns 1 if signaled. *)
         (* This is a placeholder for a real concurrent test. *)
         ok := artPThread.Signal(cv);
-        Tests.ExpectedBool(TRUE, ok, "Signal should succeed", pass);
+        Tests.ExpectedInt(artPThread.Ok, ok, "Signal should succeed", pass);
         
         ok := artPThread.Wait(cv, mutex);
-        Tests.ExpectedBool(TRUE, ok, "Wait should succeed (no real wait)", pass);
+        Tests.ExpectedInt(artPThread.Ok, ok, "Wait should succeed (no real wait)", pass);
         
         ok := artPThread.Unlock(mutex);
-        Tests.ExpectedBool(TRUE, ok, "Unlock after wait should succeed", pass);
+        Tests.ExpectedInt(artPThread.Ok, ok, "Unlock after wait should succeed", pass);
         
         artPThread.FreeCondVar(cv);
         artPThread.FreeMutex(mutex);
@@ -163,9 +165,10 @@ BEGIN
 END ThreadProc;
 
 PROCEDURE TestThread(): BOOLEAN;
-VAR pass, ok: BOOLEAN;
+VAR pass: BOOLEAN;
     t: artPThread.Thread;
     ctx: ThreadContext;
+    ok: INTEGER;
 BEGIN
     NEW(ctx);
     ctx.ran := FALSE;
@@ -175,7 +178,7 @@ BEGIN
     Tests.ExpectedBool(FALSE, t = NIL, "Thread creation should succeed", pass);
     IF t # NIL THEN
         ok := artPThread.Join(t);
-        Tests.ExpectedBool(TRUE, ok, "Thread join should succeed", pass);
+        Tests.ExpectedInt(artPThread.Ok, ok, "Thread join should succeed", pass);
         Tests.ExpectedBool(TRUE, ctx.ran, "Thread procedure should set context field", pass)
     END;
     IF pass THEN Out.String(" OK") ELSE Out.String(" FAILED") END; Out.Ln;
