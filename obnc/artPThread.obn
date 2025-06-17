@@ -20,6 +20,7 @@ CONST
     NotRecoverable* = 8;   
     OwnerDead* = 9;         
     Timeout* = 10;          
+    InvalidCondvar* = 11;
     UnknownError* = 100;  
 
 TYPE

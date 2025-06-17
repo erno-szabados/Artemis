@@ -6,19 +6,18 @@
 #include <errno.h>
 #include <stdint.h>
 
-
 #define OBERON_SOURCE_FILENAME "artPThread.obn"
 
-const int artPThread__MutexDesc_id;
-const int *const artPThread__MutexDesc_ids[1] = {&artPThread__MutexDesc_id};
+const OBNC_INTEGER artPThread__MutexDesc_id;
+const OBNC_INTEGER *const artPThread__MutexDesc_ids[1] = {&artPThread__MutexDesc_id};
 const OBNC_Td artPThread__MutexDesc_td = {artPThread__MutexDesc_ids, 1};
 
-const int artPThread__CondVarDesc_id;
-const int *const artPThread__CondVarDesc_ids[1] = {&artPThread__CondVarDesc_id};
+const OBNC_INTEGER artPThread__CondVarDesc_id;
+const OBNC_INTEGER *const artPThread__CondVarDesc_ids[1] = {&artPThread__CondVarDesc_id};
 const OBNC_Td artPThread__CondVarDesc_td = {artPThread__CondVarDesc_ids, 1};
 
-const int artPThread__ThreadDesc_id;
-const int *const artPThread__ThreadDesc_ids[1] = {&artPThread__ThreadDesc_id};
+const OBNC_INTEGER artPThread__ThreadDesc_id;
+const OBNC_INTEGER *const artPThread__ThreadDesc_ids[1] = {&artPThread__ThreadDesc_id};
 const OBNC_Td artPThread__ThreadDesc_td = {artPThread__ThreadDesc_ids, 1};
 
 artPThread__Mutex_ artPThread__NewMutex_(void)
@@ -26,8 +25,11 @@ artPThread__Mutex_ artPThread__NewMutex_(void)
 	artPThread__Mutex_ mutex;
 	pthread_mutex_t *pmutex;
 	
-	/* Allocate memory for the mutex record */
+	/* Allocate memory for the mutex record (by GC) */
 	mutex = OBNC_Allocate(sizeof(struct artPThread__MutexDesc_), OBNC_REGULAR_ALLOC);
+	if (mutex == NULL) {
+		return NULL; /* Memory allocation failed */
+	}
 	
 	/* Allocate memory for pthread_mutex_t */
 	pmutex = malloc(sizeof(pthread_mutex_t));
@@ -70,7 +72,7 @@ void artPThread__FreeMutex_(artPThread__Mutex_ *mutex_)
 }
 
 
-int artPThread__Lock_(artPThread__Mutex_ mutex_)
+OBNC_INTEGER artPThread__Lock_(artPThread__Mutex_ mutex_)
 {
 	pthread_mutex_t *pmutex;
 	if (mutex_ == NULL) {
@@ -80,18 +82,19 @@ int artPThread__Lock_(artPThread__Mutex_ mutex_)
 	if (pmutex == NULL) {
 		return artPThread__InvalidHandle_; /* invalid handle */
 	}
-	int r = pthread_mutex_lock(pmutex);
+	OBNC_INTEGER r = pthread_mutex_lock(pmutex);
 	if (r == 0) return artPThread__Ok_;
 	if (r == EDEADLK) return artPThread__Deadlock_;
 	if (r == EINVAL) return artPThread__InvalidHandle_;
 	if (r == EAGAIN) return artPThread__MaxRecursion_;
 	if (r == ENOTRECOVERABLE) return artPThread__NotRecoverable_;
 	if (r == EOWNERDEAD) return artPThread__OwnerDead_;
+	if (r == ENOMEM) return artPThread__ResourceExhausted_;
 	return artPThread__UnknownError_;
 }
 
 
-int artPThread__Unlock_(artPThread__Mutex_ mutex_)
+OBNC_INTEGER artPThread__Unlock_(artPThread__Mutex_ mutex_)
 {
 	pthread_mutex_t *pmutex;
 	
@@ -107,7 +110,7 @@ int artPThread__Unlock_(artPThread__Mutex_ mutex_)
 	}
 	
 	/* Unlock the mutex */
-	int r = pthread_mutex_unlock(pmutex);
+	OBNC_INTEGER r = pthread_mutex_unlock(pmutex);
 	if (r == 0) return artPThread__Ok_;
 	if (r == EPERM) return artPThread__NotOwner_;
 	if (r == EINVAL) return artPThread__InvalidHandle_;
@@ -115,7 +118,7 @@ int artPThread__Unlock_(artPThread__Mutex_ mutex_)
 }
 
 
-int artPThread__TryLock_(artPThread__Mutex_ mutex_)
+OBNC_INTEGER artPThread__TryLock_(artPThread__Mutex_ mutex_)
 {
 	pthread_mutex_t *pmutex;
 	if (mutex_ == NULL) {
@@ -125,7 +128,7 @@ int artPThread__TryLock_(artPThread__Mutex_ mutex_)
 	if (pmutex == NULL) {
 		return artPThread__InvalidHandle_; /* invalid handle */
 	}
-	int r = pthread_mutex_trylock(pmutex);
+	OBNC_INTEGER r = pthread_mutex_trylock(pmutex);
 	if (r == 0) return artPThread__Ok_;
 	if (r == EBUSY) return artPThread__Busy_;
 	if (r == EINVAL) return artPThread__InvalidHandle_;
@@ -143,6 +146,9 @@ artPThread__CondVar_ artPThread__NewCondVar_(void)
 
 	/* Allocate memory for the condvar record */
 	cv = OBNC_Allocate(sizeof(struct artPThread__CondVarDesc_), OBNC_REGULAR_ALLOC);
+	if (cv == NULL) {
+		return NULL; /* Memory allocation failed */
+	}
 
 	/* Allocate memory for pthread_cond_t */
 	pcv = malloc(sizeof(pthread_cond_t));
@@ -184,19 +190,24 @@ void artPThread__FreeCondVar_(artPThread__CondVar_ *cv_)
 }
 
 
-int artPThread__Wait_(artPThread__CondVar_ cv_, artPThread__Mutex_ mutex_)
+OBNC_INTEGER artPThread__Wait_(artPThread__CondVar_ cv_, artPThread__Mutex_ mutex_)
 {
 	pthread_cond_t *pcv;
 	pthread_mutex_t *pmutex;
-	if (cv_ == NULL || mutex_ == NULL) {
-		return artPThread__InvalidMutex_; /* invalid condvar or mutex */
+
+	if (cv_ == NULL) {
+		return artPThread__InvalidCondvar_; /* invalid condvar  */
+	}
+
+	if (mutex_ == NULL) {
+		return artPThread__InvalidMutex_; /* invalid mutex */
 	}
 	pcv = (pthread_cond_t *)(uintptr_t)cv_->handle_;
 	pmutex = (pthread_mutex_t *)(uintptr_t)mutex_->handle_;
 	if (pcv == NULL || pmutex == NULL) {
 		return artPThread__InvalidHandle_; /* invalid handle */
 	}
-	int r = pthread_cond_wait(pcv, pmutex);
+	OBNC_INTEGER r = pthread_cond_wait(pcv, pmutex);
 	if (r == 0) return artPThread__Ok_;
 	if (r == EINVAL) return artPThread__InvalidHandle_;
 	if (r == ENOTRECOVERABLE) return artPThread__NotRecoverable_;
@@ -206,12 +217,12 @@ int artPThread__Wait_(artPThread__CondVar_ cv_, artPThread__Mutex_ mutex_)
 }
 
 
-int artPThread__Signal_(artPThread__CondVar_ cv_)
+OBNC_INTEGER artPThread__Signal_(artPThread__CondVar_ cv_)
 {
 	pthread_cond_t *pcv;
 
 	if (cv_ == NULL) {
-		return artPThread__InvalidMutex_; /* invalid condvar */
+		return artPThread__InvalidCondvar_; /* invalid condvar */
 	}
 
 	pcv = (pthread_cond_t *)(uintptr_t)cv_->handle_;
@@ -220,7 +231,7 @@ int artPThread__Signal_(artPThread__CondVar_ cv_)
 		return artPThread__InvalidHandle_; /* invalid handle */
 	}
 
-	int r = pthread_cond_signal(pcv);
+	OBNC_INTEGER r = pthread_cond_signal(pcv);
 	if (r == 0) return artPThread__Ok_;
 	if (r == EINVAL) return artPThread__InvalidHandle_
 ;
@@ -228,12 +239,12 @@ int artPThread__Signal_(artPThread__CondVar_ cv_)
 }
 
 
-int artPThread__Broadcast_(artPThread__CondVar_ cv_)
+OBNC_INTEGER artPThread__Broadcast_(artPThread__CondVar_ cv_)
 {
 	pthread_cond_t *pcv;
 
 	if (cv_ == NULL) {
-		return artPThread__InvalidHandle_; /* sinvalid condvar */
+		return artPThread__InvalidCondvar_; /* invalid condvar */
 	}
 
 	pcv = (pthread_cond_t *)(uintptr_t)cv_->handle_;
@@ -242,7 +253,7 @@ int artPThread__Broadcast_(artPThread__CondVar_ cv_)
 		return artPThread__InvalidHandle_; /* invalid handle */
 	}
 
-	int r = pthread_cond_broadcast(pcv);
+	OBNC_INTEGER r = pthread_cond_broadcast(pcv);
 	if (r == 0) return artPThread__Ok_;
 	if (r == EINVAL) return artPThread__InvalidHandle_;
 	return artPThread__UnknownError_;
@@ -314,7 +325,7 @@ artPThread__Thread_ artPThread__NewThread_(artPThread__ThreadProc_ proc_, OBNC_I
 	return thread;
 }
 
-int artPThread__Join_(artPThread__Thread_ thread_)
+OBNC_INTEGER artPThread__Join_(artPThread__Thread_ thread_)
 {
 	pthread_t *pth;
 	if (thread_ == NULL) {
@@ -324,7 +335,7 @@ int artPThread__Join_(artPThread__Thread_ thread_)
 	if (pth == NULL) {
 		return artPThread__InvalidHandle_;
 	}
-	int r = pthread_join(*pth, NULL);
+	OBNC_INTEGER r = pthread_join(*pth, NULL);
 	if (r == 0) {
 		free(pth);
 		thread_->handle_ = 0;
