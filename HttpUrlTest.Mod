@@ -11,14 +11,62 @@ VAR
   url: HttpUrl.Url;
   raw: ARRAY 256 OF CHAR;
   ok: BOOLEAN;
+  pathStr, queryStr, fragStr: ARRAY 256 OF CHAR;
+  res: INTEGER;
 BEGIN
   pass := TRUE;
-  raw := "http://example.com/path";
-  NEW(url);
+  raw := "http://example.com:8080/path/to/resource?key1=value1&key2=value2#section";
+  
   ok := HttpUrl.Parse(raw, url);
   Tests.ExpectedBool(TRUE, ok, "Parse basic URL", pass);
+  
+  IF ok THEN
+    Tests.ExpectedString("http", url.scheme, "Scheme parsing", pass);
+    Tests.ExpectedString("example.com", url.host, "Host parsing", pass);
+    Tests.ExpectedInt(8080, url.port, "Port parsing", pass);
+    
+    (* Test path *)
+    DStrings.ToChars(url.path, pathStr, res);
+    Tests.ExpectedString("/path/to/resource", pathStr, "Path parsing", pass);
+    
+    (* Test query *)
+    DStrings.ToChars(url.query, queryStr, res);
+    Tests.ExpectedString("key1=value1&key2=value2", queryStr, "Query parsing", pass);
+    
+    (* Test fragment *)
+    DStrings.ToChars(url.frag, fragStr, res);
+    Tests.ExpectedString("section", fragStr, "Fragment parsing", pass)
+  END;
+  
   RETURN pass
 END TestParse;
+
+PROCEDURE TestParseSimple*(): BOOLEAN;
+VAR
+  pass: BOOLEAN;
+  url: HttpUrl.Url;
+  raw: ARRAY 256 OF CHAR;
+  ok: BOOLEAN;
+  pathStr: ARRAY 256 OF CHAR;
+  res: INTEGER;
+BEGIN
+  pass := TRUE;
+  raw := "https://example.com/simple";
+  
+  ok := HttpUrl.Parse(raw, url);
+  Tests.ExpectedBool(TRUE, ok, "Parse simple URL", pass);
+  
+  IF ok THEN
+    Tests.ExpectedString("https", url.scheme, "Simple scheme parsing", pass);
+    Tests.ExpectedString("example.com", url.host, "Simple host parsing", pass);
+    Tests.ExpectedInt(0, url.port, "Simple port parsing (default)", pass);
+    
+    DStrings.ToChars(url.path, pathStr, res);
+    Tests.ExpectedString("/simple", pathStr, "Simple path parsing", pass)
+  END;
+  
+  RETURN pass
+END TestParseSimple;
 
 PROCEDURE TestToString*(): BOOLEAN;
 VAR
@@ -102,6 +150,7 @@ END TestSetParam;
 BEGIN
   Tests.Init(ts, "HTTP URL Tests");
   Tests.Add(ts, TestParse);
+  Tests.Add(ts, TestParseSimple);
   Tests.Add(ts, TestToString);
   Tests.Add(ts, TestGetParam);
   Tests.Add(ts, TestSetParam);
