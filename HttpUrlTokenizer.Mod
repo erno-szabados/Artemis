@@ -7,7 +7,7 @@ Released under The 3-Clause BSD License.
 
 MODULE HttpUrlTokenizer;
 
-IMPORT Chars;
+IMPORT Chars, DStrings;
 
 CONST
     (* Token types *)
@@ -30,98 +30,96 @@ CONST
     NoError* = 0;
     SyntaxError* = 1;
 
-    MaxTokenLength* = 256;
-    MaxUrlLength* = 1024;
+    (* Tokenizer states *)
+    StateScheme = 0;
+    StateAuthority = 1;
+    StatePath = 2;
+    StateQuery = 3;
+    StateQueryKey = 4;
+    StateQueryValue = 5;
+    StateFragment = 6;
+    StateEof = 7;
 
 TYPE
     Token* = RECORD
         type*: INTEGER;
-        value*: ARRAY MaxTokenLength OF CHAR;
-        pos*: INTEGER;        (* position in input *)
+        value*: DStrings.String;
+        rider*: DStrings.Rider;
         error*: INTEGER
     END;
 
     Tokenizer* = POINTER TO TokenizerDesc;
     TokenizerDesc = RECORD
-        input: ARRAY MaxUrlLength OF CHAR;  (* URL buffer *)
-        length: INTEGER;
-        index: INTEGER;
-        currentChar: CHAR;
-        atEof: BOOLEAN;
-        error: INTEGER
+        str: DStrings.String;
+        rider: DStrings.Rider;
+        error: INTEGER;
+        state: INTEGER
     END;
     IsValidProc = PROCEDURE(ch: CHAR): BOOLEAN;
 
-(* Internal: advance to next character *)
-PROCEDURE ReadChar(tokenizer: Tokenizer);
-BEGIN
-    IF ~tokenizer.atEof THEN
-        INC(tokenizer.index);
-        IF tokenizer.index >= tokenizer.length THEN
-            tokenizer.atEof := TRUE;
-            tokenizer.currentChar := 0X
-        ELSE
-            tokenizer.currentChar := tokenizer.input[tokenizer.index]
-        END
-    END
-END ReadChar;
-
 (** Initialize tokenizer with raw URL string *)
 PROCEDURE Init*(VAR tokenizer: Tokenizer; raw: ARRAY OF CHAR);
-VAR
-    result: Tokenizer;
-    i: INTEGER;
+VAR result: Tokenizer;
 BEGIN
     NEW(result);
-    (* copy raw into internal buffer *)
-    i := 0;
-    WHILE (i < LEN(raw)) & (raw[i] # 0X) & (i < MaxUrlLength - 1) DO
-        result.input[i] := raw[i];
-        INC(i)
-    END;
-    result.input[i] := 0X;
-    result.length := i;
-    result.index := 0;
-    result.atEof := FALSE;
+    DStrings.Init(raw, result.str);
+    DStrings.Set(result.rider, result.str, 0);
     result.error := NoError;
-    result.currentChar := result.input[0];
+    result.state := StateScheme;
     tokenizer := result
 END Init;
 
-(* Internal: Read characters while predicate is true *)
-PROCEDURE ReadWhile(tokenizer: Tokenizer; isValid: IsValidProc; VAR value: ARRAY OF CHAR);
-VAR pos: INTEGER;
+(** TRUE if tokenizer has reached end of input *)
+PROCEDURE AtEof*(tokenizer: Tokenizer): BOOLEAN;
 BEGIN
-    pos := 0;
-    WHILE ~tokenizer.atEof & isValid(tokenizer.currentChar) & (pos < LEN(value) - 1) DO
-        value[pos] := tokenizer.currentChar;
-        INC(pos);
-        ReadChar(tokenizer)
+    RETURN tokenizer.rider.eot
+END AtEof;
+
+(* Internal: Read while predicate is true *)
+PROCEDURE ReadWhile(tokenizer: Tokenizer; isValid: IsValidProc; VAR value: DStrings.String);
+VAR start, len: INTEGER; ch: CHAR;
+BEGIN
+    start := tokenizer.rider.pos;
+    ch := DStrings.Peek(tokenizer.rider);
+    WHILE ~tokenizer.rider.eot & isValid(ch) DO
+        ch := DStrings.Get(tokenizer.rider);
+        ch := DStrings.Peek(tokenizer.rider)
     END;
-    value[pos] := 0X
+    len := tokenizer.rider.pos - start;
+    IF len > 0 THEN
+        DStrings.Extract(tokenizer.str, start, len, value)
+    ELSE
+        DStrings.Clear(value)
+    END
 END ReadWhile;
 
+
 (* Internal: Read until one of the delimiter characters *)
-PROCEDURE ReadUntil(tokenizer: Tokenizer; delims: ARRAY OF CHAR; VAR value: ARRAY OF CHAR);
-VAR pos, i: INTEGER; found: BOOLEAN;
+PROCEDURE ReadUntil(tokenizer: Tokenizer; delims: ARRAY OF CHAR; VAR value: DStrings.String);
+VAR start, len, i: INTEGER; ch: CHAR; found: BOOLEAN;
 BEGIN
-    pos := 0;
+    start := tokenizer.rider.pos;
     found := FALSE;
-    WHILE ~tokenizer.atEof & (pos < LEN(value) - 1) & ~found DO
+    ch := DStrings.Peek(tokenizer.rider);
+    WHILE ~tokenizer.rider.eot & ~found DO
         i := 0;
         WHILE (i < LEN(delims)) & (delims[i] # 0X) & ~found DO
-            IF tokenizer.currentChar = delims[i] THEN
+            IF ch = delims[i] THEN
                 found := TRUE
             END;
             INC(i)
         END;
         IF ~found THEN
-            value[pos] := tokenizer.currentChar;
-            INC(pos);
-            ReadChar(tokenizer)
+            ch := DStrings.Get(tokenizer.rider);
+            ch := DStrings.Peek(tokenizer.rider)
         END
     END;
-    value[pos] := 0X
+    len := tokenizer.rider.pos - start;
+    IF len > 0 THEN
+        DStrings.Extract(tokenizer.str, start, len, value)
+    ELSE
+        DStrings.Clear(value)
+    END
 END ReadUntil;
 
 (* Internal: Check if character is valid for scheme *)
@@ -132,156 +130,309 @@ BEGIN
     RETURN result
 END IsSchemeChar;
 
-(* Internal: Read remaining characters to end *)
-PROCEDURE ReadToEnd(tokenizer: Tokenizer; VAR value: ARRAY OF CHAR);
-VAR pos: INTEGER;
+(* Internal: Read scheme token and advance past ':' *)
+PROCEDURE ReadSchemeToken(tokenizer: Tokenizer; VAR token: Token);
+VAR ch: CHAR;
 BEGIN
-    pos := 0;
-    WHILE ~tokenizer.atEof & (pos < LEN(value) - 1) DO
-        value[pos] := tokenizer.currentChar;
-        INC(pos);
-        ReadChar(tokenizer)
-    END;
-    value[pos] := 0X
-END ReadToEnd;
+    ReadWhile(tokenizer, IsSchemeChar, token.value);
+    ch := DStrings.Peek(tokenizer.rider);
+    IF ~AtEof(tokenizer) & (ch = ":") THEN
+        token.type := SchemeToken;
+        ch := DStrings.Get(tokenizer.rider)  (* Advance past ':' *)
+    ELSE
+        token.type := HostToken
+    END
+END ReadSchemeToken;
 
-(* Internal: Read path including initial slash *)
-PROCEDURE ReadPath(tokenizer: Tokenizer; VAR value: ARRAY OF CHAR);
-VAR pos: INTEGER; delims: ARRAY 8 OF CHAR; found: BOOLEAN; i: INTEGER;
+(* Internal: Read slash-slash token and advance past both slashes *)
+PROCEDURE ReadSlashSlashToken(tokenizer: Tokenizer; VAR token: Token);
+VAR ch1, ch2: CHAR;
 BEGIN
-    pos := 0;
-    value[pos] := "/";  (* Include the initial slash *)
-    INC(pos);
-    ReadChar(tokenizer);  (* Skip the initial slash *)
-    
-    delims := "?#";
-    found := FALSE;
-    WHILE ~tokenizer.atEof & (pos < LEN(value) - 1) & ~found DO
-        i := 0;
-        WHILE (i < LEN(delims)) & (delims[i] # 0X) & ~found DO
-            IF tokenizer.currentChar = delims[i] THEN
-                found := TRUE
-            END;
-            INC(i)
-        END;
-        IF ~found THEN
-            value[pos] := tokenizer.currentChar;
-            INC(pos);
-            ReadChar(tokenizer)
-        END
-    END;
-    value[pos] := 0X
-END ReadPath;
+    ch1 := DStrings.Peek(tokenizer.rider);
+    IF ~tokenizer.rider.eot THEN ch1 := DStrings.Get(tokenizer.rider) END;
+    ch2 := DStrings.Peek(tokenizer.rider);
+    IF (ch1 = "/") & (ch2 = "/") THEN
+        ch2 := DStrings.Get(tokenizer.rider); (* advance past second slash *)
+        token.type := SlashSlashToken;
+        DStrings.CopyChars("//", token.value)
+    ELSE
+        (* Not actually a double slash, treat as path or error *)
+        token.type := PathToken;
+        DStrings.CopyChars("/", token.value)
+    END
+END ReadSlashSlashToken;
 
-(** Get next token from URL input *)
-PROCEDURE NextToken*(tokenizer: Tokenizer; VAR token: Token);
+(* Internal: Read host token up to ':', '/', '?', or '#' *)
+PROCEDURE ReadHostToken(tokenizer: Tokenizer; VAR token: Token);
 VAR delims: ARRAY 8 OF CHAR;
 BEGIN
-    token.error := NoError;
-    token.pos := tokenizer.index;
-    token.value[0] := 0X;
+    token.type := HostToken;
+    delims := ":/?#";
+    ReadUntil(tokenizer, delims, token.value)
+END ReadHostToken;
 
-    IF tokenizer.atEof THEN
-        token.type := EofToken
-    ELSIF tokenizer.currentChar = "/" THEN
-        (* Check for "//" *)
-        IF (tokenizer.index + 1 < tokenizer.length) & (tokenizer.input[tokenizer.index + 1] = "/") THEN
-            token.type := SlashSlashToken;
-            token.value[0] := "/";
-            token.value[1] := "/";
-            token.value[2] := 0X;
-            ReadChar(tokenizer);
-            ReadChar(tokenizer)
+(* Internal: Read port token and advance past ':' *)
+PROCEDURE ReadPortToken(tokenizer: Tokenizer; VAR token: Token);
+VAR ch: CHAR;
+BEGIN
+    ch := DStrings.Peek(tokenizer.rider);
+    IF ch = ":" THEN
+        ch := DStrings.Get(tokenizer.rider)
+    END;
+    token.type := PortToken;
+    ReadWhile(tokenizer, Chars.IsDigit, token.value)
+END ReadPortToken;
+
+(* Internal: Read path token *)
+PROCEDURE ReadPathToken(tokenizer: Tokenizer; VAR token: Token);
+VAR start, len: INTEGER; ch: CHAR; found: BOOLEAN;
+BEGIN
+    token.type := PathToken;
+    start := tokenizer.rider.pos;
+    ch := DStrings.Get(tokenizer.rider);  (* Skip the initial slash *)
+    found := FALSE;
+    ch := DStrings.Peek(tokenizer.rider);
+    WHILE ~tokenizer.rider.eot & ~found DO
+        IF (ch = "?") OR (ch = "#") THEN
+            found := TRUE
         ELSE
-            (* Single slash - start of path *)
-            token.type := PathToken;
-            ReadPath(tokenizer, token.value)
+            ch := DStrings.Get(tokenizer.rider);
+            ch := DStrings.Peek(tokenizer.rider)
         END
-    ELSIF tokenizer.currentChar = ":" THEN
-        (* Could be end of scheme or start of port *)
-        ReadChar(tokenizer);
-        IF ~tokenizer.atEof & Chars.IsDigit(tokenizer.currentChar) THEN
-            token.type := PortToken;
-            ReadWhile(tokenizer, Chars.IsDigit, token.value)
-        ELSE
-            (* Just a colon separator *)
-            token.type := ErrorToken;
-            token.error := SyntaxError
-        END
-    ELSIF tokenizer.currentChar = "?" THEN
-        token.type := QueryStartToken;
-        token.value[0] := "?";
-        token.value[1] := 0X;
-        ReadChar(tokenizer)
-    ELSIF tokenizer.currentChar = "#" THEN
-        token.type := FragmentStartToken;
-        token.value[0] := "#";
-        token.value[1] := 0X;
-        ReadChar(tokenizer);
-        IF ~tokenizer.atEof THEN
-            token.type := FragmentToken;
-            ReadToEnd(tokenizer, token.value)
-        END
-    ELSIF tokenizer.currentChar = "=" THEN
-        token.type := QueryEqualsToken;
-        token.value[0] := "=";
-        token.value[1] := 0X;
-        ReadChar(tokenizer)
-    ELSIF tokenizer.currentChar = "&" THEN
-        token.type := QuerySeparatorToken;
-        token.value[0] := "&";
-        token.value[1] := 0X;
-        ReadChar(tokenizer)
-    ELSIF Chars.IsAlpha(tokenizer.currentChar) THEN
-        (* Could be scheme or host *)
-        ReadWhile(tokenizer, IsSchemeChar, token.value);
-        IF ~tokenizer.atEof & (tokenizer.currentChar = ":") THEN
-            token.type := SchemeToken
-        ELSE
-            (* Treat as host if no colon found *)
-            token.type := HostToken
-            (* ReadUntil will overwrite token.value, but that's what we want *)
-        END
-    ELSIF Chars.IsDigit(tokenizer.currentChar) OR (tokenizer.currentChar = "[") THEN
-        (* IP address or IPv6 *)
-        token.type := HostToken;
-        delims := ":/?#";
-        ReadUntil(tokenizer, delims, token.value)
+    END;
+    len := tokenizer.rider.pos - start;
+    IF len > 0 THEN
+        DStrings.Extract(tokenizer.str, start, len, token.value)
     ELSE
-        (* Query key/value or unrecognized *)
-        delims := "=&#";
-        ReadUntil(tokenizer, delims, token.value);
-        IF token.value[0] # 0X THEN
-            token.type := QueryKeyToken
-        ELSE
-            token.type := ErrorToken;
-            token.error := SyntaxError
+        DStrings.Clear(token.value)
+    END
+END ReadPathToken;
+
+(* Internal: Read query start token and advance past '?' *)
+PROCEDURE ReadQueryStartToken(tokenizer: Tokenizer; VAR token: Token);
+VAR ch: CHAR;
+BEGIN
+    token.type := QueryStartToken;
+    DStrings.CopyChars("?", token.value);
+    ch := DStrings.Get(tokenizer.rider)  (* Advance past '?' *)
+END ReadQueryStartToken;
+
+(* Internal: Read query key token *)
+PROCEDURE ReadQueryKeyToken(tokenizer: Tokenizer; VAR token: Token);
+VAR delims: ARRAY 8 OF CHAR;
+BEGIN
+    token.type := QueryKeyToken;
+    delims := "=&#";
+    ReadUntil(tokenizer, delims, token.value)
+END ReadQueryKeyToken;
+
+(* Internal: Read query equals token and advance past '=' *)
+PROCEDURE ReadQueryEqualsToken(tokenizer: Tokenizer; VAR token: Token);
+VAR ch: CHAR;
+BEGIN
+    token.type := QueryEqualsToken;
+    DStrings.CopyChars("=", token.value);
+    ch := DStrings.Get(tokenizer.rider)  (* Advance past '=' *)
+END ReadQueryEqualsToken;
+
+(* Internal: Read query value token *)
+PROCEDURE ReadQueryValueToken(tokenizer: Tokenizer; VAR token: Token);
+VAR delims: ARRAY 8 OF CHAR;
+BEGIN
+    token.type := QueryValueToken;
+    delims := "&#";
+    ReadUntil(tokenizer, delims, token.value)
+END ReadQueryValueToken;
+
+(* Internal: Read query separator token and advance past '&' *)
+PROCEDURE ReadQuerySeparatorToken(tokenizer: Tokenizer; VAR token: Token);
+VAR ch: CHAR;
+BEGIN
+    token.type := QuerySeparatorToken;
+    DStrings.CopyChars("&", token.value);
+    ch := DStrings.Get(tokenizer.rider)  (* Advance past '&' *)
+END ReadQuerySeparatorToken;
+
+(* Internal: Read fragment start token and advance past '#' *)
+PROCEDURE ReadFragmentStartToken(tokenizer: Tokenizer; VAR token: Token);
+VAR ch: CHAR;
+BEGIN
+    token.type := FragmentStartToken;
+    DStrings.CopyChars("#", token.value);
+    ch := DStrings.Get(tokenizer.rider)  (* Advance past '#' *)
+END ReadFragmentStartToken;
+
+(* Internal: Read fragment token *)
+PROCEDURE ReadFragmentToken(tokenizer: Tokenizer; VAR token: Token);
+VAR start, len: INTEGER; ch : CHAR;
+BEGIN
+    token.type := FragmentToken;
+    start := tokenizer.rider.pos;
+    WHILE ~tokenizer.rider.eot DO
+        ch := DStrings.Get(tokenizer.rider)
+    END;
+    len := tokenizer.rider.pos - start;
+    IF len > 0 THEN
+        DStrings.Extract(tokenizer.str, start, len, token.value)
+    ELSE
+        DStrings.Clear(token.value)
+    END
+END ReadFragmentToken;
+
+(* Internal: Peek at next character without advancing position *)
+PROCEDURE PeekNext(tokenizer: Tokenizer): CHAR;
+VAR tempRider: DStrings.Rider; ch: CHAR;
+BEGIN
+    tempRider := tokenizer.rider;
+    ch := DStrings.Get(tempRider);
+    ch := DStrings.Peek(tempRider);
+    RETURN ch
+END PeekNext;
+
+(* Update NextToken to use and update tokenizer.state for stateful parsing *)
+PROCEDURE NextToken*(tokenizer: Tokenizer; VAR token: Token);
+VAR ch, next: CHAR;
+BEGIN
+    token.error := NoError;
+    DStrings.Init("", token.value);
+    ch := DStrings.Peek(tokenizer.rider);
+    IF AtEof(tokenizer) THEN
+        token.type := EofToken;
+        tokenizer.state := StateEof
+    ELSE
+        CASE tokenizer.state OF
+            StateScheme:
+                (* Detect scheme, protocol-relative or absolute path *)
+                next := PeekNext(tokenizer);
+                IF Chars.IsAlpha(ch) THEN
+                    ReadSchemeToken(tokenizer, token);
+                    tokenizer.state := StateAuthority
+                ELSIF (ch = "/") & (next = "/") THEN
+                    ReadSlashSlashToken(tokenizer, token);
+                    tokenizer.state := StateAuthority
+                ELSIF ch = "/" THEN
+                    ReadPathToken(tokenizer, token);
+                    tokenizer.state := StatePath
+                ELSE
+                    token.type := ErrorToken;
+                    tokenizer.error := SyntaxError;
+                    tokenizer.state := StateEof
+                END
+            |
+            StateAuthority:
+                next := PeekNext(tokenizer);
+                IF (ch = "/") & (next = "/") THEN
+                    ReadSlashSlashToken(tokenizer, token);
+                    tokenizer.state := StateAuthority
+                ELSIF ch = "/" THEN
+                    ReadPathToken(tokenizer, token);
+                    tokenizer.state := StatePath
+                ELSIF ch = ":" THEN
+                    ReadPortToken(tokenizer, token);
+                    tokenizer.state := StateAuthority
+                ELSIF ch = "?" THEN
+                    ReadQueryStartToken(tokenizer, token);
+                    tokenizer.state := StateQuery
+                ELSIF ch = "#" THEN
+                    ReadFragmentStartToken(tokenizer, token);
+                    tokenizer.state := StateFragment
+                ELSE
+                    ReadHostToken(tokenizer, token);
+                    ch := DStrings.Peek(tokenizer.rider);
+                    IF ch = ":" THEN
+                        tokenizer.state := StateAuthority
+                    ELSIF ch = "/" THEN
+                        tokenizer.state := StatePath
+                    ELSIF ch = "?" THEN
+                        tokenizer.state := StateQuery
+                    ELSIF ch = "#" THEN
+                        tokenizer.state := StateFragment
+                    ELSE
+                        tokenizer.state := StateEof
+                    END
+                END
+            |
+            StatePath:
+                IF ch = "?" THEN
+                    ReadQueryStartToken(tokenizer, token);
+                    tokenizer.state := StateQuery
+                ELSIF ch = "#" THEN
+                    ReadFragmentStartToken(tokenizer, token);
+                    tokenizer.state := StateFragment
+                ELSE
+                    ReadPathToken(tokenizer, token);
+                    ch := DStrings.Peek(tokenizer.rider);
+                    IF ch = "?" THEN
+                        tokenizer.state := StateQuery
+                    ELSIF ch = "#" THEN
+                        tokenizer.state := StateFragment
+                    ELSE
+                        tokenizer.state := StateEof
+                    END
+                END
+            |
+            StateQuery:
+                IF ch = "#" THEN
+                    ReadFragmentStartToken(tokenizer, token);
+                    tokenizer.state := StateFragment
+                ELSIF ch = "&" THEN
+                    ReadQuerySeparatorToken(tokenizer, token);
+                    tokenizer.state := StateQueryKey
+                ELSIF ch = "=" THEN
+                    ReadQueryEqualsToken(tokenizer, token);
+                    tokenizer.state := StateQueryValue
+                ELSE
+                    ReadQueryKeyToken(tokenizer, token);
+                    tokenizer.state := StateQueryKey
+                END
+            |
+            StateQueryKey:
+                IF ch = "=" THEN
+                    ReadQueryEqualsToken(tokenizer, token);
+                    tokenizer.state := StateQueryValue
+                ELSIF ch = "&" THEN
+                    ReadQuerySeparatorToken(tokenizer, token);
+                    tokenizer.state := StateQueryKey
+                ELSIF ch = "#" THEN
+                    ReadFragmentStartToken(tokenizer, token);
+                    tokenizer.state := StateFragment
+                ELSE
+                    ReadQueryKeyToken(tokenizer, token);
+                    tokenizer.state := StateQueryKey
+                END
+            |
+            StateQueryValue:
+                IF ch = "&" THEN
+                    ReadQuerySeparatorToken(tokenizer, token);
+                    tokenizer.state := StateQueryKey
+                ELSIF ch = "#" THEN
+                    ReadFragmentStartToken(tokenizer, token);
+                    tokenizer.state := StateFragment
+                ELSE
+                    ReadQueryValueToken(tokenizer, token);
+                    tokenizer.state := StateQueryValue
+                END
+            |
+            StateFragment:
+                ReadFragmentToken(tokenizer, token);
+                tokenizer.state := StateEof
+            |
+            StateEof:
+                token.type := EofToken
         END
     END
 END NextToken;
 
-(** Check if tokenizer has reached end of input *)
-PROCEDURE AtEof*(tokenizer: Tokenizer): BOOLEAN;
-VAR result: BOOLEAN;
-BEGIN
-    result := tokenizer.atEof;
-    RETURN result
-END AtEof;
-
 (** Get current position in input *)
 PROCEDURE GetPos*(tokenizer: Tokenizer): INTEGER;
-VAR result: INTEGER;
 BEGIN
-    result := tokenizer.index;
-    RETURN result
+    RETURN tokenizer.rider.pos
 END GetPos;
 
 (** Get current error state *)
 PROCEDURE GetError*(tokenizer: Tokenizer): INTEGER;
-VAR result: INTEGER;
 BEGIN
-    result := tokenizer.error;
-    RETURN result
+    RETURN tokenizer.error
 END GetError;
 
 END HttpUrlTokenizer.
