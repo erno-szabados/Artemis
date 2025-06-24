@@ -13,11 +13,6 @@ TYPE
     frag*:   DStrings.String     (* “section1” *)
   END;
 
-(* Internal helpers, not exported *)
-PROCEDURE decodePercent(VAR s: DStrings.String);
-BEGIN
-    (* TODO *)
-END decodePercent;  
 
 (* Parses the string to an URL descriptor. Returns TRUE on success. *)
 PROCEDURE Parse*(raw: ARRAY OF CHAR; VAR u: Url): BOOLEAN;
