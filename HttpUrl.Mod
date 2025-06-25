@@ -43,7 +43,7 @@ VAR
     pathParts: DStrings.String;
     fragParts: DStrings.String;
     expectingValue: BOOLEAN;
-    lastKey: ARRAY 256 OF CHAR;
+    lastKey: DStrings.String;
 BEGIN
     result := FALSE;
     
@@ -61,7 +61,7 @@ BEGIN
     
     (* Parse tokens in order: [scheme:][//]host[:port][/path][?query][#fragment] *)
     expectingValue := FALSE;
-    lastKey[0] := 0X;
+    DStrings.Init("", lastKey);
     
     WHILE ~HttpUrlTokenizer.AtEof(tokenizer) DO
         HttpUrlTokenizer.NextToken(tokenizer, token);
@@ -77,7 +77,7 @@ BEGIN
             DStrings.Copy(token.value, newUrl.scheme);
             result := TRUE
         ELSIF token.type = HttpUrlTokenizer.SlashSlashToken THEN
-            (* Skip "//" - it's just a separator *)
+            (* Skip "//" - it"s just a separator *)
             result := TRUE
         ELSIF token.type = HttpUrlTokenizer.HostToken THEN
             (* Copy host *)
@@ -98,9 +98,9 @@ BEGIN
         ELSIF token.type = HttpUrlTokenizer.QueryKeyToken THEN
             (* Store key for query parameter *)
             DStrings.Append(token.value, queryParts);
-            DStrings.ToChars(token.value, lastKey, truncated);
+            DStrings.Copy(token.value, lastKey);
             expectingValue := TRUE;
-            result := truncated = 0
+            result := TRUE
         ELSIF token.type = HttpUrlTokenizer.QueryEqualsToken THEN
             (* Add equals sign to query string *)
             DStrings.CopyChars("=", pathParts);
@@ -117,7 +117,7 @@ BEGIN
             DStrings.Append(pathParts, queryParts);
             result := TRUE
         ELSIF token.type = HttpUrlTokenizer.FragmentStartToken THEN
-            (* Skip "#" - it's just a separator *)
+            (* Skip "#" - it"s just a separator *)
             result := TRUE
         ELSIF token.type = HttpUrlTokenizer.FragmentToken THEN
             (* Store fragment *)
@@ -130,12 +130,12 @@ BEGIN
     END;
     
     (* If we had a pending key without value, add it *)
-    IF expectingValue & (lastKey[0] # 0X) THEN
+    IF expectingValue & (DStrings.Length(lastKey) > 0) THEN
         IF DStrings.Length(queryParts) > 0 THEN
             DStrings.CopyChars("&", pathParts);
             DStrings.Append(pathParts, queryParts)
         END;
-        DStrings.CopyChars(lastKey, pathParts);
+        DStrings.Copy(lastKey, pathParts);
         DStrings.Append(pathParts, queryParts)
     END;
     
@@ -196,10 +196,56 @@ BEGIN
   RETURN result
 END ToString;
 
-(* Returns TRUE if the key was found, FALSE otherwise. *)
-PROCEDURE GetParam*(u: Url; key: ARRAY OF CHAR; VAR value: DStrings.String) : BOOLEAN;
+(** Returns TRUE if the key was found, FALSE otherwise. Param value returned in value *)
+PROCEDURE GetParam*(u: Url; keyC: ARRAY OF CHAR; VAR value: DStrings.String) : BOOLEAN;
+VAR
+  result, inKey: BOOLEAN;
+  qRider, keyRider, valueRider: DStrings.Rider;
+  ch: CHAR;
+  currentKey, currentValue, key: DStrings.String;
 BEGIN
-  RETURN FALSE
+  result := FALSE;
+  DStrings.Init("", value);
+  IF (u = NIL) OR (DStrings.Length(u.query) = 0) THEN
+    result := FALSE
+  ELSE
+    DStrings.Init("", currentKey);
+    DStrings.Init("", currentValue);
+    DStrings.Init(keyC, key);
+    inKey := TRUE;
+    DStrings.Set(qRider, u.query, 0);
+    DStrings.Set(keyRider, currentKey, 0);
+    DStrings.Set(valueRider, currentValue, 0);
+
+    WHILE qRider.pos < DStrings.Length(u.query) DO
+      ch := DStrings.Get(qRider);
+      IF (ch = "=") & inKey THEN
+        inKey := FALSE
+      ELSIF (ch = "&") THEN
+        IF DStrings.Equal(currentKey, key) THEN
+          DStrings.Copy(currentValue, value);
+          result := TRUE
+        END;
+        DStrings.Init("", currentKey);
+        DStrings.Init("", currentValue);
+        DStrings.Set(keyRider, currentKey, 0);
+        DStrings.Set(valueRider, currentValue, 0);
+        inKey := TRUE
+      ELSE
+        IF inKey THEN
+          DStrings.WriteChar(keyRider, ch)
+        ELSE
+          DStrings.WriteChar(valueRider, ch)
+        END
+      END
+    END;
+    (* Check last parameter after loop *)
+    IF DStrings.Equal(currentKey, key) THEN
+      DStrings.Copy(currentValue, value);
+      result := TRUE
+    END
+  END;
+  RETURN result
 END GetParam;
 
 (* Sets the value of a query parameter. If the key does not exist, it is created. 
