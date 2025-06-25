@@ -860,9 +860,9 @@ END WriteString;
 PROCEDURE WriteDString*(VAR r : Rider; source : String);
   VAR c : CHAR; s : Rider;
 BEGIN
-  Set(s, source, 0); c := Get(r);
+  Set(s, source, 0); c := Get(s);
   WHILE c # 0X DO
-    Put(s, c); c := Get(r);
+    Put(r, c); c := Get(s);
   END;
 END WriteDString;
 
