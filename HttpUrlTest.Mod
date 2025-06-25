@@ -11,7 +11,7 @@ VAR
   url: HttpUrl.Url;
   raw: ARRAY 256 OF CHAR;
   ok: BOOLEAN;
-  pathStr, queryStr, fragStr: ARRAY 256 OF CHAR;
+  pathStr, queryStr, fragStr, hostStr, schemeStr: ARRAY 256 OF CHAR;
   res: INTEGER;
 BEGIN
   pass := TRUE;
@@ -21,8 +21,10 @@ BEGIN
   Tests.ExpectedBool(TRUE, ok, "Parse basic URL", pass);
   
   IF ok THEN
-    Tests.ExpectedString("http", url.scheme, "Scheme parsing", pass);
-    Tests.ExpectedString("example.com", url.host, "Host parsing", pass);
+    DStrings.ToChars(url.scheme, schemeStr, res);
+    Tests.ExpectedString("http", schemeStr, "Scheme parsing", pass);
+    DStrings.ToChars(url.host, hostStr, res);
+    Tests.ExpectedString("example.com", hostStr, "Host parsing", pass);
     Tests.ExpectedInt(8080, url.port, "Port parsing", pass);
     
     (* Test path *)
@@ -47,7 +49,7 @@ VAR
   url: HttpUrl.Url;
   raw: ARRAY 256 OF CHAR;
   ok: BOOLEAN;
-  pathStr: ARRAY 256 OF CHAR;
+  pathStr, schemeStr, hostStr: ARRAY 256 OF CHAR;
   res: INTEGER;
 BEGIN
   pass := TRUE;
@@ -57,10 +59,11 @@ BEGIN
   Tests.ExpectedBool(TRUE, ok, "Parse simple URL", pass);
   
   IF ok THEN
-    Tests.ExpectedString("https", url.scheme, "Simple scheme parsing", pass);
-    Tests.ExpectedString("example.com", url.host, "Simple host parsing", pass);
+    DStrings.ToChars(url.scheme, schemeStr, res);
+    Tests.ExpectedString("https", schemeStr, "Scheme parsing", pass);
+    DStrings.ToChars(url.host, hostStr, res);
+    Tests.ExpectedString("example.com", hostStr, "Host parsing", pass);
     Tests.ExpectedInt(0, url.port, "Simple port parsing (default)", pass);
-    
     DStrings.ToChars(url.path, pathStr, res);
     Tests.ExpectedString("/simple", pathStr, "Simple path parsing", pass)
   END;
