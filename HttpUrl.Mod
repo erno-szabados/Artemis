@@ -1,6 +1,6 @@
 MODULE HttpUrl;
 
-IMPORT Chars, DStrings, HttpUrlTokenizer;  (* for dynamic path/query/fragment storage *)
+IMPORT DStrings, HttpUrlTokenizer;
 
 TYPE
   Url* = POINTER TO UrlDesc;
@@ -161,38 +161,37 @@ VAR
 BEGIN
   result := FALSE;
   DStrings.Init("", out);
-(* FIXME *)
-  (* 
-  IF u.scheme[0] # 0X THEN
-    DStrings.AppendChars(u.scheme, out);
-    DStrings.AppendChars("://", out)
+  DStrings.Set(rider, out, DStrings.Length(out));
+
+  
+  IF DStrings.Length(u.scheme) > 0 THEN
+    DStrings.WriteDString(rider, u.scheme);
+    DStrings.WriteString(rider, "://")
   END;
 
-  IF u.host[0] # 0X THEN
-    DStrings.AppendChars(u.host, out);
+  IF DStrings.Length(u.host) > 0 THEN
+    DStrings.WriteDString(rider, u.host);
     result := TRUE
   END;
 
   IF u.port # 0 THEN
-    DStrings.Set(rider, out, DStrings.Length(out));
     DStrings.WriteChar(rider, ":");
-    DStrings.Set(rider, out, DStrings.Length(out));
     DStrings.WriteInt(rider, u.port)
   END;
 
   IF DStrings.Length(u.path) > 0 THEN
-    DStrings.Append(u.path, out)
+    DStrings.WriteDString(rider, u.path)
   END;
 
   IF DStrings.Length(u.query) > 0 THEN
-    DStrings.AppendChars("?", out);
-    DStrings.Append(u.query, out)
+    DStrings.WriteChar(rider, "?");
+    DStrings.WriteDString(rider, u.query)
   END;
 
   IF DStrings.Length(u.frag) > 0 THEN
-    DStrings.AppendChars("#", out);
-    DStrings.Append(u.frag, out)
-  END; *)
+    DStrings.WriteChar(rider, "#");
+    DStrings.WriteDString(rider, u.frag)
+  END;
 
   RETURN result
 END ToString;
