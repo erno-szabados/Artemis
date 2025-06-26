@@ -11,7 +11,11 @@
 *)
 MODULE HttpHeader;
 
-IMPORT DStrings, Dictionary;
+IMPORT DStrings, Dictionary, Collections;
+
+CONST
+  MaxKeyLength = 256; (* Maximum length for header keys *)
+
 
 TYPE
   Header* = POINTER TO HeaderDesc;
@@ -60,9 +64,23 @@ END ToString;
 PROCEDURE Get*(h: Header; key: ARRAY OF CHAR; VAR value: DStrings.String): BOOLEAN;
 VAR
   result: BOOLEAN;
+  normKey: DStrings.String;
+  keyBuf: ARRAY MaxKeyLength OF CHAR;
+  item: Collections.ItemPtr;
+  found: BOOLEAN;
+  res: INTEGER;
 BEGIN
   result := FALSE;
-  (* TODO: Implement header field retrieval *)
+  IF h # NIL THEN
+    DStrings.Init(key, normKey);
+    DStrings.Cap(normKey); (* Normalize to uppercase for case-insensitive lookup *)
+    DStrings.ToChars(normKey, keyBuf, res);
+    found := Dictionary.GetString(h.fields, keyBuf, item);
+    IF found & (item IS DStrings.String) THEN
+      DStrings.Copy(item(DStrings.String), value);
+      result := TRUE
+    END
+  END;
   RETURN result
 END Get;
 
@@ -72,9 +90,19 @@ END Get;
 PROCEDURE Set*(h: Header; key, value: ARRAY OF CHAR): BOOLEAN;
 VAR
   result: BOOLEAN;
+  normKey, val: DStrings.String;
+  keyBuf: ARRAY MaxKeyLength OF CHAR;
+  res: INTEGER;
 BEGIN
   result := FALSE;
-  (* TODO: Implement header field setting *)
+  IF h # NIL THEN
+    DStrings.Init(key, normKey);
+    DStrings.Cap(normKey); (* Normalize to uppercase for case-insensitive storage *)
+    DStrings.ToChars(normKey, keyBuf, res);
+    DStrings.Init(value, val);
+    Dictionary.PutString(h.fields, keyBuf, val);
+    result := TRUE
+  END;
   RETURN result
 END Set;
 
@@ -84,9 +112,21 @@ END Set;
 PROCEDURE Remove*(h: Header; key: ARRAY OF CHAR): BOOLEAN;
 VAR
   result: BOOLEAN;
+  normKey: DStrings.String;
+  keyBuf: ARRAY MaxKeyLength OF CHAR;
+  res: INTEGER;
+  removed: BOOLEAN;
 BEGIN
   result := FALSE;
-  (* TODO: Implement header field removal *)
+  IF h # NIL THEN
+    DStrings.Init(key, normKey);
+    DStrings.Cap(normKey); (* Normalize to uppercase for case-insensitive removal *)
+    DStrings.ToChars(normKey, keyBuf, res);
+    removed := Dictionary.RemoveString(h.fields, keyBuf);
+    IF removed THEN
+      result := TRUE
+    END
+  END;
   RETURN result
 END Remove;
 
