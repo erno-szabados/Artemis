@@ -289,136 +289,178 @@ BEGIN
     RETURN ch
 END PeekNext;
 
+(* Internal: Handle StateScheme state *)
+PROCEDURE HandleStateScheme(tokenizer: Tokenizer; VAR token: Token);
+VAR ch, next: CHAR;
+BEGIN
+    next := PeekNext(tokenizer);
+    ch := DStrings.Peek(tokenizer.rider);
+    IF Chars.IsAlpha(ch) THEN
+        ReadSchemeToken(tokenizer, token);
+        tokenizer.state := StateAuthority
+    ELSIF (ch = "/") & (next = "/") THEN
+        ReadSlashSlashToken(tokenizer, token);
+        tokenizer.state := StateAuthority
+    ELSIF ch = "/" THEN
+        ReadPathToken(tokenizer, token);
+        tokenizer.state := StatePath
+    ELSE
+        token.type := ErrorToken;
+        tokenizer.error := SyntaxError;
+        tokenizer.state := StateEof
+    END
+END HandleStateScheme;
+
+(* Internal: Handle StateAuthority state *)
+PROCEDURE HandleStateAuthority(tokenizer: Tokenizer; VAR token: Token);
+VAR ch, next: CHAR;
+BEGIN
+    next := PeekNext(tokenizer);
+    ch := DStrings.Peek(tokenizer.rider);
+    IF (ch = "/") & (next = "/") THEN
+        ReadSlashSlashToken(tokenizer, token);
+        tokenizer.state := StateAuthority
+    ELSIF ch = "/" THEN
+        ReadPathToken(tokenizer, token);
+        tokenizer.state := StatePath
+    ELSIF ch = ":" THEN
+        ReadPortToken(tokenizer, token);
+        tokenizer.state := StateAuthority
+    ELSIF ch = "?" THEN
+        ReadQueryStartToken(tokenizer, token);
+        tokenizer.state := StateQuery
+    ELSIF ch = "#" THEN
+        ReadFragmentStartToken(tokenizer, token);
+        tokenizer.state := StateFragment
+    ELSE
+        ReadHostToken(tokenizer, token);
+        ch := DStrings.Peek(tokenizer.rider);
+        IF ch = ":" THEN
+            tokenizer.state := StateAuthority
+        ELSIF ch = "/" THEN
+            tokenizer.state := StatePath
+        ELSIF ch = "?" THEN
+            tokenizer.state := StateQuery
+        ELSIF ch = "#" THEN
+            tokenizer.state := StateFragment
+        ELSE
+            tokenizer.state := StateEof
+        END
+    END
+END HandleStateAuthority;
+
+(* Internal: Handle StatePath state *)
+PROCEDURE HandleStatePath(tokenizer: Tokenizer; VAR token: Token);
+VAR ch: CHAR;
+BEGIN
+    ch := DStrings.Peek(tokenizer.rider);
+    IF ch = "?" THEN
+        ReadQueryStartToken(tokenizer, token);
+        tokenizer.state := StateQuery
+    ELSIF ch = "#" THEN
+        ReadFragmentStartToken(tokenizer, token);
+        tokenizer.state := StateFragment
+    ELSE
+        ReadPathToken(tokenizer, token);
+        ch := DStrings.Peek(tokenizer.rider);
+        IF ch = "?" THEN
+            tokenizer.state := StateQuery
+        ELSIF ch = "#" THEN
+            tokenizer.state := StateFragment
+        ELSE
+            tokenizer.state := StateEof
+        END
+    END
+END HandleStatePath;
+
+(* Internal: Handle StateQuery state *)
+PROCEDURE HandleStateQuery(tokenizer: Tokenizer; VAR token: Token);
+VAR ch: CHAR;
+BEGIN
+    ch := DStrings.Peek(tokenizer.rider);
+    IF ch = "#" THEN
+        ReadFragmentStartToken(tokenizer, token);
+        tokenizer.state := StateFragment
+    ELSIF ch = "&" THEN
+        ReadQuerySeparatorToken(tokenizer, token);
+        tokenizer.state := StateQueryKey
+    ELSIF ch = "=" THEN
+        ReadQueryEqualsToken(tokenizer, token);
+        tokenizer.state := StateQueryValue
+    ELSE
+        ReadQueryKeyToken(tokenizer, token);
+        tokenizer.state := StateQueryKey
+    END
+END HandleStateQuery;
+
+(* Internal: Handle StateQueryKey state *)
+PROCEDURE HandleStateQueryKey(tokenizer: Tokenizer; VAR token: Token);
+VAR ch: CHAR;
+BEGIN
+    ch := DStrings.Peek(tokenizer.rider);
+    IF ch = "=" THEN
+        ReadQueryEqualsToken(tokenizer, token);
+        tokenizer.state := StateQueryValue
+    ELSIF ch = "&" THEN
+        ReadQuerySeparatorToken(tokenizer, token);
+        tokenizer.state := StateQueryKey
+    ELSIF ch = "#" THEN
+        ReadFragmentStartToken(tokenizer, token);
+        tokenizer.state := StateFragment
+    ELSE
+        ReadQueryKeyToken(tokenizer, token);
+        tokenizer.state := StateQueryKey
+    END
+END HandleStateQueryKey;
+
+(* Internal: Handle StateQueryValue state *)
+PROCEDURE HandleStateQueryValue(tokenizer: Tokenizer; VAR token: Token);
+VAR ch: CHAR;
+BEGIN
+    ch := DStrings.Peek(tokenizer.rider);
+    IF ch = "&" THEN
+        ReadQuerySeparatorToken(tokenizer, token);
+        tokenizer.state := StateQueryKey
+    ELSIF ch = "#" THEN
+        ReadFragmentStartToken(tokenizer, token);
+        tokenizer.state := StateFragment
+    ELSE
+        ReadQueryValueToken(tokenizer, token);
+        tokenizer.state := StateQueryValue
+    END
+END HandleStateQueryValue;
+
+(* Internal: Handle StateFragment state *)
+PROCEDURE HandleStateFragment(tokenizer: Tokenizer; VAR token: Token);
+BEGIN
+    ReadFragmentToken(tokenizer, token);
+    tokenizer.state := StateEof
+END HandleStateFragment;
+
+(* Internal: Handle StateEof state *)
+PROCEDURE HandleStateEof(tokenizer: Tokenizer; VAR token: Token);
+BEGIN
+    token.type := EofToken
+END HandleStateEof;
+
 (* Update NextToken to use and update tokenizer.state for stateful parsing *)
 PROCEDURE NextToken*(tokenizer: Tokenizer; VAR token: Token);
-VAR ch, next: CHAR;
 BEGIN
     token.error := NoError;
     DStrings.Init("", token.value);
-    ch := DStrings.Peek(tokenizer.rider);
     IF AtEof(tokenizer) THEN
         token.type := EofToken;
         tokenizer.state := StateEof
     ELSE
         CASE tokenizer.state OF
-            StateScheme:
-                (* Detect scheme, protocol-relative or absolute path *)
-                next := PeekNext(tokenizer);
-                IF Chars.IsAlpha(ch) THEN
-                    ReadSchemeToken(tokenizer, token);
-                    tokenizer.state := StateAuthority
-                ELSIF (ch = "/") & (next = "/") THEN
-                    ReadSlashSlashToken(tokenizer, token);
-                    tokenizer.state := StateAuthority
-                ELSIF ch = "/" THEN
-                    ReadPathToken(tokenizer, token);
-                    tokenizer.state := StatePath
-                ELSE
-                    token.type := ErrorToken;
-                    tokenizer.error := SyntaxError;
-                    tokenizer.state := StateEof
-                END
-            |
-            StateAuthority:
-                next := PeekNext(tokenizer);
-                IF (ch = "/") & (next = "/") THEN
-                    ReadSlashSlashToken(tokenizer, token);
-                    tokenizer.state := StateAuthority
-                ELSIF ch = "/" THEN
-                    ReadPathToken(tokenizer, token);
-                    tokenizer.state := StatePath
-                ELSIF ch = ":" THEN
-                    ReadPortToken(tokenizer, token);
-                    tokenizer.state := StateAuthority
-                ELSIF ch = "?" THEN
-                    ReadQueryStartToken(tokenizer, token);
-                    tokenizer.state := StateQuery
-                ELSIF ch = "#" THEN
-                    ReadFragmentStartToken(tokenizer, token);
-                    tokenizer.state := StateFragment
-                ELSE
-                    ReadHostToken(tokenizer, token);
-                    ch := DStrings.Peek(tokenizer.rider);
-                    IF ch = ":" THEN
-                        tokenizer.state := StateAuthority
-                    ELSIF ch = "/" THEN
-                        tokenizer.state := StatePath
-                    ELSIF ch = "?" THEN
-                        tokenizer.state := StateQuery
-                    ELSIF ch = "#" THEN
-                        tokenizer.state := StateFragment
-                    ELSE
-                        tokenizer.state := StateEof
-                    END
-                END
-            |
-            StatePath:
-                IF ch = "?" THEN
-                    ReadQueryStartToken(tokenizer, token);
-                    tokenizer.state := StateQuery
-                ELSIF ch = "#" THEN
-                    ReadFragmentStartToken(tokenizer, token);
-                    tokenizer.state := StateFragment
-                ELSE
-                    ReadPathToken(tokenizer, token);
-                    ch := DStrings.Peek(tokenizer.rider);
-                    IF ch = "?" THEN
-                        tokenizer.state := StateQuery
-                    ELSIF ch = "#" THEN
-                        tokenizer.state := StateFragment
-                    ELSE
-                        tokenizer.state := StateEof
-                    END
-                END
-            |
-            StateQuery:
-                IF ch = "#" THEN
-                    ReadFragmentStartToken(tokenizer, token);
-                    tokenizer.state := StateFragment
-                ELSIF ch = "&" THEN
-                    ReadQuerySeparatorToken(tokenizer, token);
-                    tokenizer.state := StateQueryKey
-                ELSIF ch = "=" THEN
-                    ReadQueryEqualsToken(tokenizer, token);
-                    tokenizer.state := StateQueryValue
-                ELSE
-                    ReadQueryKeyToken(tokenizer, token);
-                    tokenizer.state := StateQueryKey
-                END
-            |
-            StateQueryKey:
-                IF ch = "=" THEN
-                    ReadQueryEqualsToken(tokenizer, token);
-                    tokenizer.state := StateQueryValue
-                ELSIF ch = "&" THEN
-                    ReadQuerySeparatorToken(tokenizer, token);
-                    tokenizer.state := StateQueryKey
-                ELSIF ch = "#" THEN
-                    ReadFragmentStartToken(tokenizer, token);
-                    tokenizer.state := StateFragment
-                ELSE
-                    ReadQueryKeyToken(tokenizer, token);
-                    tokenizer.state := StateQueryKey
-                END
-            |
-            StateQueryValue:
-                IF ch = "&" THEN
-                    ReadQuerySeparatorToken(tokenizer, token);
-                    tokenizer.state := StateQueryKey
-                ELSIF ch = "#" THEN
-                    ReadFragmentStartToken(tokenizer, token);
-                    tokenizer.state := StateFragment
-                ELSE
-                    ReadQueryValueToken(tokenizer, token);
-                    tokenizer.state := StateQueryValue
-                END
-            |
-            StateFragment:
-                ReadFragmentToken(tokenizer, token);
-                tokenizer.state := StateEof
-            |
-            StateEof:
-                token.type := EofToken
+            StateScheme:      HandleStateScheme(tokenizer, token)
+            | StateAuthority: HandleStateAuthority(tokenizer, token)
+            | StatePath:      HandleStatePath(tokenizer, token)
+            | StateQuery:     HandleStateQuery(tokenizer, token)
+            | StateQueryKey:  HandleStateQueryKey(tokenizer, token)
+            | StateQueryValue:HandleStateQueryValue(tokenizer, token)
+            | StateFragment:  HandleStateFragment(tokenizer, token)
+            | StateEof:       HandleStateEof(tokenizer, token)
         END
     END
 END NextToken;
