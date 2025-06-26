@@ -49,7 +49,6 @@ END StringToInt;
 PROCEDURE Parse*(raw: ARRAY OF CHAR; VAR u: Url): BOOLEAN;
 VAR
     result: BOOLEAN;
-    truncated : INTEGER;
     tokenizer: HttpUrlTokenizer.Tokenizer;
     token: HttpUrlTokenizer.Token;
     newUrl: Url;
@@ -270,8 +269,60 @@ END GetParam;
 (* Sets the value of a query parameter. If the key does not exist, it is created. 
    Returns TRUE on success. *)
 PROCEDURE SetParam*(u: Url; key, value: ARRAY OF CHAR) : BOOLEAN;
+VAR
+  result, found, first: BOOLEAN;
+  qRider: DStrings.Rider;
+  currentKey, currentValue, keyStr, valueStr, newQuery, temp: DStrings.String;
 BEGIN
-  RETURN FALSE
+  result := FALSE;
+  found := FALSE;
+  first := TRUE;
+  DStrings.Init(key, keyStr);
+  DStrings.Init(value, valueStr);
+  DStrings.Init("", newQuery);
+  IF (u # NIL) THEN
+    IF DStrings.Length(u.query) > 0 THEN
+      DStrings.Set(qRider, u.query, 0);
+      WHILE NextQueryParam(qRider, currentKey, currentValue) DO
+        IF DStrings.Equal(currentKey, keyStr) THEN
+          (* Replace value for this key *)
+          IF ~first THEN
+            DStrings.CopyChars("&", temp);
+            DStrings.Append(temp, newQuery)
+          END;
+          DStrings.CopyChars("", temp);
+          DStrings.Append(keyStr, temp);
+          DStrings.CopyChars("=", temp);
+          DStrings.Append(temp, newQuery);
+          DStrings.Append(valueStr, newQuery);
+          found := TRUE
+        ELSE
+          IF ~first THEN
+            DStrings.CopyChars("&", temp);
+            DStrings.Append(temp, newQuery)
+          END;
+          DStrings.Append(currentKey, newQuery);
+          DStrings.CopyChars("=", temp);
+          DStrings.Append(temp, newQuery);
+          DStrings.Append(currentValue, newQuery)
+        END;
+        first := FALSE
+      END
+    END;
+    IF ~found THEN
+      IF DStrings.Length(newQuery) > 0 THEN
+        DStrings.CopyChars("&", temp);
+        DStrings.Append(temp, newQuery)
+      END;
+      DStrings.Append(keyStr, newQuery);
+      DStrings.CopyChars("=", temp);
+      DStrings.Append(temp, newQuery);
+      DStrings.Append(valueStr, newQuery)
+    END;
+    DStrings.Copy(newQuery, u.query);
+    result := TRUE
+  END;
+  RETURN result
 END SetParam;
 
 END HttpUrl.
