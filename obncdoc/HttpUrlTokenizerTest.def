@@ -1,0 +1,17 @@
+DEFINITION HttpUrlTokenizerTest;
+
+PROCEDURE TestBasicScheme(): BOOLEAN;
+
+PROCEDURE TestSlashSlash(): BOOLEAN;
+
+PROCEDURE TestSimpleHost(): BOOLEAN;
+
+PROCEDURE TestPathOnly(): BOOLEAN;
+
+PROCEDURE TestUtilityFunctions(): BOOLEAN;
+
+PROCEDURE TestFullURL(): BOOLEAN;
+
+PROCEDURE TestErrorCases(): BOOLEAN;
+
+END HttpUrlTokenizerTest.

@@ -1,8 +1,28 @@
+(** HttpUrlTokenizer.Mod - Character-based tokenizer for HTTP URLs.
+
+Copyright (C) 2025 Artemis Project Contributors
+
+Released under The 3-Clause BSD License.
+*)
+
 MODULE HttpUrl;
+
+(** 
+  HttpUrl - URL parsing and manipulation module 
+
+  This module provides functionality to parse URLs, serialize them back to strings,
+  and manipulate query parameters. It uses the DStrings module for string handling
+  and the HttpUrlTokenizer for tokenizing URL components. 
+  
+  Limitations:
+  - Does not support percent-encoding (e.g., "%20" for spaces).
+  - Does not handle Unicode characters in URLs.
+  *)
 
 IMPORT DStrings, HttpUrlTokenizer;
 
 TYPE
+ (* URL descriptor, with scheme, host, port, path, query and frag. *)
   Url* = POINTER TO UrlDesc;
   UrlDesc* = RECORD
     scheme*: DStrings.String;      (* “http”, “https” *)
@@ -45,7 +65,7 @@ BEGIN
     RETURN result
 END StringToInt;
 
-(* Parses the string to an URL descriptor. Returns TRUE on success. *)
+(** Parses the string to an URL descriptor. Returns TRUE on success. *)
 PROCEDURE Parse*(raw: ARRAY OF CHAR; VAR u: Url): BOOLEAN;
 VAR
     result: BOOLEAN;
@@ -168,7 +188,7 @@ BEGIN
 END Parse;
 
 
-(* Reserialize the URL. On success: u # NIL, u -> fields populated, returns TRUE *)
+(** Reserialize the URL. On success: u # NIL, u -> fields populated, returns TRUE *)
 PROCEDURE ToString*(u: Url; VAR out: DStrings.String) : BOOLEAN;
 VAR
   result: BOOLEAN;
@@ -266,7 +286,7 @@ BEGIN
   RETURN result
 END GetParam;
 
-(* Sets the value of a query parameter. If the key does not exist, it is created. 
+(** Sets the value of a query parameter. If the key does not exist, it is created. 
    Returns TRUE on success. *)
 PROCEDURE SetParam*(u: Url; key, value: ARRAY OF CHAR) : BOOLEAN;
 VAR

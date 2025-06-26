@@ -1,0 +1,74 @@
+<!DOCTYPE html PUBLIC '-//W3C//DTD XHTML 1.0 Strict//EN' 'http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd'>
+<html xmlns='http://www.w3.org/1999/xhtml' xml:lang='en' lang='en'>
+	<head>
+		<meta name='viewport' content='width=device-width, initial-scale=1.0' />
+		<meta http-equiv='Content-Type' content='text/html; charset=utf-8' />
+		<title>DEFINITION HttpUrlTokenizer</title>
+		<link rel='stylesheet' type='text/css' href='style.css' />
+	</head>
+	<body>
+		<p><a href='index.html'>Index</a></p>
+
+		<pre>
+<span class='comment'>(* HttpUrlTokenizer.Mod - Character-based tokenizer for HTTP URLs.
+
+Copyright (C) 2025 Artemis Project Contributors
+
+Released under The 3-Clause BSD License.
+*)</span>
+
+DEFINITION <em>HttpUrlTokenizer</em>;
+
+<span class='comment'>(* This module provides a tokenizer for HTTP URLs, allowing parsing of
+   various components like scheme, host, port, path, query parameters,
+   and fragments. It supports basic error handling and state management. *)</span>
+
+IMPORT DStrings;
+
+CONST
+    EofToken = 0;
+    SchemeToken = 1;
+    SlashSlashToken = 2;
+    HostToken = 3;
+    PortToken = 4;
+    PathToken = 5;
+    QueryStartToken = 6;
+    QueryKeyToken = 7;
+    QueryEqualsToken = 8;
+    QueryValueToken = 9;
+    QuerySeparatorToken = 10;
+    FragmentStartToken = 11;
+    FragmentToken = 12;
+    ErrorToken = 13;
+
+    NoError = 0;
+    SyntaxError = 1;
+
+TYPE
+    Token = RECORD
+        type: INTEGER;
+        value: DStrings.String;
+        rider: DStrings.Rider;
+        error: INTEGER
+    END;
+
+    Tokenizer = POINTER TO TokenizerDesc;
+
+<span class='comment'>(* Initialize tokenizer with raw URL string *)</span>
+PROCEDURE <em>Init</em>(VAR tokenizer: Tokenizer; raw: ARRAY OF CHAR);
+
+<span class='comment'>(* TRUE if tokenizer has reached end of input *)</span>
+PROCEDURE <em>AtEof</em>(tokenizer: Tokenizer): BOOLEAN;
+
+PROCEDURE <em>NextToken</em>(tokenizer: Tokenizer; VAR token: Token);
+
+<span class='comment'>(* Get current position in input *)</span>
+PROCEDURE <em>GetPos</em>(tokenizer: Tokenizer): INTEGER;
+
+<span class='comment'>(* Get current error state *)</span>
+PROCEDURE <em>GetError</em>(tokenizer: Tokenizer): INTEGER;
+
+END HttpUrlTokenizer.
+</pre>
+	</body>
+</html>

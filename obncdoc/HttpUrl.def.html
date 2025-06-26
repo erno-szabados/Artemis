@@ -1,0 +1,63 @@
+<!DOCTYPE html PUBLIC '-//W3C//DTD XHTML 1.0 Strict//EN' 'http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd'>
+<html xmlns='http://www.w3.org/1999/xhtml' xml:lang='en' lang='en'>
+	<head>
+		<meta name='viewport' content='width=device-width, initial-scale=1.0' />
+		<meta http-equiv='Content-Type' content='text/html; charset=utf-8' />
+		<title>DEFINITION HttpUrl</title>
+		<link rel='stylesheet' type='text/css' href='style.css' />
+	</head>
+	<body>
+		<p><a href='index.html'>Index</a></p>
+
+		<pre>
+<span class='comment'>(* HttpUrlTokenizer.Mod - Character-based tokenizer for HTTP URLs.
+
+Copyright (C) 2025 Artemis Project Contributors
+
+Released under The 3-Clause BSD License.
+*)</span>
+
+DEFINITION <em>HttpUrl</em>;
+
+<span class='comment'>(* 
+  HttpUrl - URL parsing and manipulation module 
+
+  This module provides functionality to parse URLs, serialize them back to strings,
+  and manipulate query parameters. It uses the DStrings module for string handling
+  and the HttpUrlTokenizer for tokenizing URL components. 
+  
+  Limitations:
+  - Does not support percent-encoding (e.g., "%20" for spaces).
+  - Does not handle Unicode characters in URLs.
+  *)</span>
+
+IMPORT DStrings;
+
+TYPE
+  Url = POINTER TO UrlDesc;
+  UrlDesc = RECORD
+    scheme: DStrings.String;
+    host:   DStrings.String;
+    port:   INTEGER;
+    path:   DStrings.String;
+    query:  DStrings.String;
+    frag:   DStrings.String
+  END;
+
+<span class='comment'>(* Parses the string to an URL descriptor. Returns TRUE on success. *)</span>
+PROCEDURE <em>Parse</em>(raw: ARRAY OF CHAR; VAR u: Url): BOOLEAN;
+
+<span class='comment'>(* Reserialize the URL. On success: u # NIL, u -&gt; fields populated, returns TRUE *)</span>
+PROCEDURE <em>ToString</em>(u: Url; VAR out: DStrings.String) : BOOLEAN;
+
+<span class='comment'>(* Returns TRUE if the key was found, FALSE otherwise. Param value returned in value *)</span>
+PROCEDURE <em>GetParam</em>(u: Url; keyC: ARRAY OF CHAR; VAR value: DStrings.String) : BOOLEAN;
+
+<span class='comment'>(* Sets the value of a query parameter. If the key does not exist, it is created. 
+   Returns TRUE on success. *)</span>
+PROCEDURE <em>SetParam</em>(u: Url; key, value: ARRAY OF CHAR) : BOOLEAN;
+
+END HttpUrl.
+</pre>
+	</body>
+</html>

@@ -1,0 +1,13 @@
+DEFINITION HttpUrlTest;
+
+PROCEDURE TestParse(): BOOLEAN;
+
+PROCEDURE TestParseSimple(): BOOLEAN;
+
+PROCEDURE TestToString(): BOOLEAN;
+
+PROCEDURE TestGetParam(): BOOLEAN;
+
+PROCEDURE TestSetParam(): BOOLEAN;
+
+END HttpUrlTest.
