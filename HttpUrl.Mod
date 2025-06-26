@@ -212,12 +212,42 @@ BEGIN
   RETURN result
 END ToString;
 
+(* Internal: Extract next key-value pair from query string. Returns TRUE if a pair was found, FALSE if at end. Advances rider. *)
+PROCEDURE NextQueryParam(VAR rider: DStrings.Rider; VAR key, value: DStrings.String): BOOLEAN;
+VAR
+  inKey, found: BOOLEAN;
+  ch: CHAR;
+  keyRider, valueRider: DStrings.Rider;
+BEGIN
+  found := FALSE;
+  DStrings.Init("", key);
+  DStrings.Init("", value);
+  DStrings.Set(keyRider, key, 0);
+  DStrings.Set(valueRider, value, 0);
+  inKey := TRUE;
+  WHILE ~rider.eot & ~found DO
+    ch := DStrings.Get(rider);
+    IF (ch = "=") & inKey THEN
+      inKey := FALSE
+    ELSIF (ch = "&") THEN
+      found := TRUE
+    ELSE
+      IF inKey THEN
+        DStrings.WriteChar(keyRider, ch)
+      ELSE
+        DStrings.WriteChar(valueRider, ch)
+      END
+    END
+  END;
+  (* If we stopped because of "&" or end, found a param if key is not empty *)
+  RETURN DStrings.Length(key) > 0
+END NextQueryParam;
+
 (** Returns TRUE if the key was found, FALSE otherwise. Param value returned in value *)
 PROCEDURE GetParam*(u: Url; keyC: ARRAY OF CHAR; VAR value: DStrings.String) : BOOLEAN;
 VAR
-  result, inKey: BOOLEAN;
-  qRider, keyRider, valueRider: DStrings.Rider;
-  ch: CHAR;
+  result: BOOLEAN;
+  qRider: DStrings.Rider;
   currentKey, currentValue, key: DStrings.String;
 BEGIN
   result := FALSE;
@@ -225,40 +255,13 @@ BEGIN
   IF (u = NIL) OR (DStrings.Length(u.query) = 0) THEN
     result := FALSE
   ELSE
-    DStrings.Init("", currentKey);
-    DStrings.Init("", currentValue);
     DStrings.Init(keyC, key);
-    inKey := TRUE;
     DStrings.Set(qRider, u.query, 0);
-    DStrings.Set(keyRider, currentKey, 0);
-    DStrings.Set(valueRider, currentValue, 0);
-
-    WHILE qRider.pos < DStrings.Length(u.query) DO
-      ch := DStrings.Get(qRider);
-      IF (ch = "=") & inKey THEN
-        inKey := FALSE
-      ELSIF (ch = "&") THEN
-        IF DStrings.Equal(currentKey, key) THEN
-          DStrings.Copy(currentValue, value);
-          result := TRUE
-        END;
-        DStrings.Init("", currentKey);
-        DStrings.Init("", currentValue);
-        DStrings.Set(keyRider, currentKey, 0);
-        DStrings.Set(valueRider, currentValue, 0);
-        inKey := TRUE
-      ELSE
-        IF inKey THEN
-          DStrings.WriteChar(keyRider, ch)
-        ELSE
-          DStrings.WriteChar(valueRider, ch)
-        END
+    WHILE NextQueryParam(qRider, currentKey, currentValue) DO
+      IF DStrings.Equal(currentKey, key) THEN
+        DStrings.Copy(currentValue, value);
+        result := TRUE
       END
-    END;
-    (* Check last parameter after loop *)
-    IF DStrings.Equal(currentKey, key) THEN
-      DStrings.Copy(currentValue, value);
-      result := TRUE
     END
   END;
   RETURN result
