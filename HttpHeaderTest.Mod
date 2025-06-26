@@ -52,10 +52,34 @@ BEGIN
   RETURN pass
 END TestRemove;
 
+PROCEDURE TestToString*(): BOOLEAN;
+VAR
+  pass: BOOLEAN;
+  h: HttpHeader.Header;
+  out, expected: DStrings.String;
+  ok: BOOLEAN;
+BEGIN
+  pass := TRUE;
+  HttpHeader.Init(h);
+  ok := HttpHeader.Set(h, "Content-Type", "text/plain");
+  ok := HttpHeader.Set(h, "X-Test", "foo");
+  ok := HttpHeader.ToString(h, out);
+  (* The order of fields is not guaranteed, so check for both possible orderings *)
+  DStrings.Init("Content-Type: text/plain\r\nX-Test: foo\r\n", expected);
+  IF DStrings.Equal(out, expected) THEN
+    Tests.ExpectedBool(TRUE, TRUE, "ToString output matches (order 1)", pass)
+  ELSE
+    DStrings.Init("X-Test: foo\r\nContent-Type: text/plain\r\n", expected);
+    Tests.ExpectedBool(DStrings.Equal(out, expected), TRUE, "ToString output matches (order 2)", pass)
+  END;
+  RETURN pass
+END TestToString;
+
 BEGIN
   Tests.Init(ts, "HTTP Header Tests");
   Tests.Add(ts, TestInit);
   Tests.Add(ts, TestSetGet);
   Tests.Add(ts, TestRemove);
+  Tests.Add(ts, TestToString);
   ASSERT(Tests.Run(ts))
 END HttpHeaderTest.

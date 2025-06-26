@@ -45,16 +45,42 @@ BEGIN
   RETURN result
 END Parse;
 
-(**
+(*
+  Helper procedure to write a single header field as "Key: Value\r\n" for serialization.
+*)
+PROCEDURE WriteHeader(key: ARRAY OF CHAR; value: Collections.ItemPtr; VAR state: Collections.VisitorState): BOOLEAN;
+VAR
+  val: DStrings.String;
+  rider: DStrings.Rider;
+BEGIN
+  IF value IS DStrings.String THEN
+    val := value(DStrings.String);
+    DStrings.Set(rider, val, DStrings.Length(val));
+    DStrings.WriteString(rider, key);
+    DStrings.WriteString(rider, ": ");
+    DStrings.WriteDString(rider, val);
+    DStrings.WriteString(rider, "\r\n")
+  END;
+  RETURN TRUE
+END WriteHeader;
+
+(***
   Serializes the header fields into a string suitable for sending over HTTP.
   Returns TRUE on success.
 *)
 PROCEDURE ToString*(h: Header; VAR out: DStrings.String): BOOLEAN;
 VAR
   result: BOOLEAN;
+  state: Dictionary.DictVisitorState;
+  rider: DStrings.Rider;
+  first: BOOLEAN;
 BEGIN
   result := FALSE;
-  (* TODO: Implement header serialization *)
+  DStrings.Init("", out);
+  DStrings.Set(rider, out, 0);
+  first := TRUE;
+  Dictionary.ForeachString(h.fields, WriteHeader, state);
+  result := TRUE;
   RETURN result
 END ToString;
 
