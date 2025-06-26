@@ -1,11 +1,15 @@
 (** HttpUrlTokenizer.Mod - Character-based tokenizer for HTTP URLs.
 
-Copyright (C) 2025
+Copyright (C) 2025 Artemis Project Contributors
 
 Released under The 3-Clause BSD License.
 *)
 
 MODULE HttpUrlTokenizer;
+
+(** This module provides a tokenizer for HTTP URLs, allowing parsing of
+   various components like scheme, host, port, path, query parameters,
+   and fragments. It supports basic error handling and state management. *)
 
 IMPORT Chars, DStrings;
 
@@ -400,7 +404,10 @@ PROCEDURE HandleStateQuery(tokenizer: Tokenizer; VAR token: Token);
 VAR ch: CHAR;
 BEGIN
     ch := DStrings.Peek(tokenizer.rider);
-    IF ch = "#" THEN
+    IF ch = "?" THEN
+        ReadQueryStartToken(tokenizer, token);
+        tokenizer.state := StateQuery
+    ELSIF ch = "#" THEN
         ReadFragmentStartToken(tokenizer, token);
         tokenizer.state := StateFragment
     ELSIF ch = "&" THEN
