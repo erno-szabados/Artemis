@@ -130,20 +130,6 @@ BEGIN
     RETURN result
 END IsSchemeChar;
 
-(* Internal: Read scheme token and advance past ':' *)
-PROCEDURE ReadSchemeToken(tokenizer: Tokenizer; VAR token: Token);
-VAR ch: CHAR;
-BEGIN
-    ReadWhile(tokenizer, IsSchemeChar, token.value);
-    ch := DStrings.Peek(tokenizer.rider);
-    IF ~AtEof(tokenizer) & (ch = ":") THEN
-        token.type := SchemeToken;
-        ch := DStrings.Get(tokenizer.rider)  (* Advance past ':' *)
-    ELSE
-        token.type := HostToken
-    END
-END ReadSchemeToken;
-
 (* Internal: Read slash-slash token and advance past both slashes *)
 PROCEDURE ReadSlashSlashToken(tokenizer: Tokenizer; VAR token: Token);
 VAR ch1, ch2: CHAR;
@@ -289,15 +275,50 @@ BEGIN
     RETURN ch
 END PeekNext;
 
+(* Internal: Read scheme or host logic - check if string looks like a hostname 
+   (contains a dot and only valid hostname chars) *)
+PROCEDURE LooksLikeHost(tokenizer: Tokenizer; startPos, endPos: INTEGER): BOOLEAN;
+VAR ch: CHAR; hasDot, valid: BOOLEAN; tempRider: DStrings.Rider;
+BEGIN
+    hasDot := FALSE;
+    valid := TRUE;
+    DStrings.Set(tempRider, tokenizer.str, startPos);
+    WHILE (tempRider.pos < endPos) & ~tempRider.eot & valid DO
+        ch := DStrings.Get(tempRider);
+        IF ch = "." THEN hasDot := TRUE END;
+        IF ~Chars.IsAlphaNum(ch) & (ch # ".") & (ch # "-") THEN
+            valid := FALSE
+        END
+    END;
+    RETURN valid & hasDot
+END LooksLikeHost;
+
 (* Internal: Handle StateScheme state *)
 PROCEDURE HandleStateScheme(tokenizer: Tokenizer; VAR token: Token);
-VAR ch, next: CHAR;
+VAR ch, next: CHAR; start, endPos: INTEGER;
 BEGIN
     next := PeekNext(tokenizer);
     ch := DStrings.Peek(tokenizer.rider);
     IF Chars.IsAlpha(ch) THEN
-        ReadSchemeToken(tokenizer, token);
-        tokenizer.state := StateAuthority
+        start := tokenizer.rider.pos;
+        ReadWhile(tokenizer, IsSchemeChar, token.value);
+        endPos := tokenizer.rider.pos;
+        ch := DStrings.Peek(tokenizer.rider);
+        IF ~AtEof(tokenizer) & (ch = ":") THEN
+            token.type := SchemeToken;
+            ch := DStrings.Get(tokenizer.rider); (* Advance past ':' *)
+            tokenizer.state := StateAuthority
+        ELSIF LooksLikeHost(tokenizer, start, endPos) THEN
+            (* Rewind rider to start, treat as host *)
+            DStrings.Set(tokenizer.rider, tokenizer.str, start);
+            ReadHostToken(tokenizer, token);
+            tokenizer.state := StateEof
+        ELSE
+            token.type := ErrorToken;
+            DStrings.Clear(token.value); (* Clear value for error token *)
+            tokenizer.error := SyntaxError;
+            tokenizer.state := StateEof
+        END
     ELSIF (ch = "/") & (next = "/") THEN
         ReadSlashSlashToken(tokenizer, token);
         tokenizer.state := StateAuthority
@@ -306,6 +327,7 @@ BEGIN
         tokenizer.state := StatePath
     ELSE
         token.type := ErrorToken;
+        DStrings.Clear(token.value); (* Clear value for error token *)
         tokenizer.error := SyntaxError;
         tokenizer.state := StateEof
     END

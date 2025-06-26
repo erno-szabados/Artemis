@@ -139,6 +139,44 @@ BEGIN
     RETURN pass
 END TestFullURL;
 
+(* Note: Unicode and percent-encoding are not handled by the current implementation, so tests for these cases are omitted. *)
+
+(* Additional: Test error cases to improve robustness and coverage *)
+PROCEDURE TestErrorCases*(): BOOLEAN;
+VAR pass: BOOLEAN;
+    expectedTypes: ARRAY 2 OF INTEGER;
+    expectedValues: ARRAY 2 OF ARRAY 32 OF CHAR;
+BEGIN
+    pass := TRUE;
+    (* Malformed: missing scheme delimiter *)
+    expectedTypes[0] := HttpUrlTokenizer.ErrorToken;
+    expectedTypes[1] := HttpUrlTokenizer.EofToken;
+    expectedValues[0] := "";
+    expectedValues[1] := "";
+    RunTokenizerCase("http//example.com", expectedTypes, expectedValues, "Malformed missing colon", pass);
+
+    (* Malformed: only a colon *)
+    expectedTypes[0] := HttpUrlTokenizer.ErrorToken;
+    expectedTypes[1] := HttpUrlTokenizer.EofToken;
+    expectedValues[0] := "";
+    expectedValues[1] := "";
+    RunTokenizerCase(":", expectedTypes, expectedValues, "Only colon", pass);
+
+    (* Malformed: only a question mark *)
+    expectedTypes[0] := HttpUrlTokenizer.ErrorToken;
+    expectedTypes[1] := HttpUrlTokenizer.EofToken;
+    expectedValues[0] := "";
+    expectedValues[1] := "";
+    RunTokenizerCase("?", expectedTypes, expectedValues, "Only question mark", pass);
+
+    (* Empty input *)
+    expectedTypes[0] := HttpUrlTokenizer.EofToken;
+    expectedValues[0] := "";
+    RunTokenizerCase("", expectedTypes, expectedValues, "Empty input", pass);
+
+    RETURN pass
+END TestErrorCases;
+
 BEGIN
   Tests.Init(ts, "HTTP URL Tokenizer Tests");
   Tests.Add(ts, TestBasicScheme);
@@ -147,5 +185,6 @@ BEGIN
   Tests.Add(ts, TestPathOnly);
   Tests.Add(ts, TestUtilityFunctions);
   Tests.Add(ts, TestFullURL);
+  Tests.Add(ts, TestErrorCases);
   ASSERT(Tests.Run(ts))
 END HttpUrlTokenizerTest.
