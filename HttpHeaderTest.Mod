@@ -96,11 +96,86 @@ BEGIN
   RETURN pass
 END TestToString;
 
+PROCEDURE TestParse() : BOOLEAN;
+VAR
+  pass: BOOLEAN;
+  h: HttpHeader.Header;
+  rawHeaders: ARRAY 512 OF CHAR;
+  value: DStrings.String;
+  ok: BOOLEAN;
+  rawStr: DStrings.String;
+  r: DStrings.Rider;
+  res: INTEGER;
+  valueBuf: ARRAY 256 OF CHAR;
+BEGIN
+  pass := TRUE;
+  
+  (* Test parsing basic headers *)
+  DStrings.Init("", rawStr);
+  DStrings.Set(r, rawStr, 0);
+  DStrings.WriteString(r, "Content-Type: text/html");
+  DStrings.WriteChar(r, Chars.CR);
+  DStrings.WriteChar(r, Chars.LF);
+  DStrings.WriteString(r, "Content-Length: 1234");
+  DStrings.WriteChar(r, Chars.CR);
+  DStrings.WriteChar(r, Chars.LF);
+  DStrings.WriteString(r, "X-Custom-Header: custom value");
+  DStrings.WriteChar(r, Chars.CR);
+  DStrings.WriteChar(r, Chars.LF);
+  DStrings.ToChars(rawStr, rawHeaders, res);
+  
+  HttpHeader.Init(h);
+  ok := HttpHeader.Parse(rawHeaders, h);
+  Tests.ExpectedBool(TRUE, ok, "Parse should succeed", pass);
+  
+  (* Test retrieved values (case-insensitive) *)
+  ok := HttpHeader.Get(h, "content-type", value);
+  Tests.ExpectedBool(TRUE, ok, "Get content-type should succeed", pass);
+  DStrings.ToChars(value, valueBuf, res);
+  Tests.ExpectedString("text/html", valueBuf, "content-type value", pass);
+  
+  ok := HttpHeader.Get(h, "CONTENT-LENGTH", value);
+  Tests.ExpectedBool(TRUE, ok, "Get CONTENT-LENGTH should succeed", pass);
+  DStrings.ToChars(value, valueBuf, res);
+  Tests.ExpectedString("1234", valueBuf, "content-length value", pass);
+  
+  ok := HttpHeader.Get(h, "x-custom-header", value);
+  Tests.ExpectedBool(TRUE, ok, "Get x-custom-header should succeed", pass);
+  DStrings.ToChars(value, valueBuf, res);
+  Tests.ExpectedString("custom value", valueBuf, "custom header value", pass);
+  
+  (* Test parsing with whitespace *)
+  DStrings.Init("", rawStr);
+  DStrings.Set(r, rawStr, 0);
+  DStrings.WriteString(r, "Header-With-Spaces:   value with spaces   ");
+  DStrings.WriteChar(r, Chars.CR);
+  DStrings.WriteChar(r, Chars.LF);
+  DStrings.ToChars(rawStr, rawHeaders, res);
+  
+  HttpHeader.Init(h);
+  ok := HttpHeader.Parse(rawHeaders, h);
+  Tests.ExpectedBool(TRUE, ok, "Parse with spaces should succeed", pass);
+  
+  ok := HttpHeader.Get(h, "header-with-spaces", value);
+  Tests.ExpectedBool(TRUE, ok, "Get header with spaces should succeed", pass);
+  DStrings.ToChars(value, valueBuf, res);
+  Tests.ExpectedString("value with spaces", valueBuf, "header value should be trimmed", pass);
+  
+  (* Test empty input *)
+  rawHeaders := "";
+  HttpHeader.Init(h);
+  ok := HttpHeader.Parse(rawHeaders, h);
+  Tests.ExpectedBool(TRUE, ok, "Parse empty input should succeed", pass);
+  
+  RETURN pass
+END TestParse;
+
 BEGIN
   Tests.Init(ts, "HTTP Header Tests");
   Tests.Add(ts, TestInit);
   Tests.Add(ts, TestSetGet);
   Tests.Add(ts, TestRemove);
   Tests.Add(ts, TestToString);
+  Tests.Add(ts, TestParse);
   ASSERT(Tests.Run(ts))
 END HttpHeaderTest.
