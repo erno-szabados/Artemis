@@ -1,6 +1,6 @@
 MODULE HttpUrl;
 
-IMPORT DStrings, HttpUrlTokenizer;
+IMPORT DStrings, HttpUrlTokenizer, Out;
 
 TYPE
   Url* = POINTER TO UrlDesc;
@@ -13,6 +13,20 @@ TYPE
     frag*:   DStrings.String     (* “section1” *)
   END;
 
+(* Internal: Dump token information *)
+PROCEDURE DumpToken(token: HttpUrlTokenizer.Token);
+VAR 
+  buf : ARRAY 256 OF CHAR;
+  truncated: INTEGER;
+BEGIN
+  Out.String("Token type: ");
+  Out.Int(token.type, 0);
+  Out.String(" value: [");
+  DStrings.ToChars(token.value, buf, truncated);
+  Out.String(buf);
+  Out.String("]");
+  Out.Ln();
+END DumpToken;
 
 (* Internal: Convert DStrings.String to integer *)
 PROCEDURE StringToInt(s: DStrings.String): INTEGER;
@@ -65,6 +79,8 @@ BEGIN
     
     WHILE ~HttpUrlTokenizer.AtEof(tokenizer) DO
         HttpUrlTokenizer.NextToken(tokenizer, token);
+
+        DumpToken(token);
         
         IF token.type = HttpUrlTokenizer.ErrorToken THEN
             (* Parsing error occurred *)
