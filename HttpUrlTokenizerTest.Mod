@@ -5,91 +5,79 @@ IMPORT HttpUrlTokenizer, Tests, DStrings;
 VAR 
     ts : Tests.TestSet;
 
-PROCEDURE TestBasicScheme*(): BOOLEAN;
-VAR
-    pass: BOOLEAN;
-    tokenizer: HttpUrlTokenizer.Tokenizer;
+(* Helper: Run a tokenizer test case with expected token types and values *)
+PROCEDURE RunTokenizerCase(input: ARRAY OF CHAR; expectedTypes: ARRAY OF INTEGER; expectedValues: ARRAY OF ARRAY OF CHAR; testName: ARRAY OF CHAR; VAR pass: BOOLEAN);
+VAR tokenizer: HttpUrlTokenizer.Tokenizer;
     token: HttpUrlTokenizer.Token;
     value: ARRAY 64 OF CHAR;
-    res: INTEGER;
+    res, i: INTEGER;
+BEGIN
+    HttpUrlTokenizer.Init(tokenizer, input);
+    i := 0;
+    WHILE i < LEN(expectedTypes) DO
+        HttpUrlTokenizer.NextToken(tokenizer, token);
+        Tests.ExpectedInt(expectedTypes[i], token.type, testName, pass);
+        IF i < LEN(expectedValues) THEN
+            DStrings.ToChars(token.value, value, res);
+            Tests.ExpectedString(expectedValues[i], value, testName, pass)
+        END;
+        INC(i)
+    END
+END RunTokenizerCase;
+
+PROCEDURE TestBasicScheme*(): BOOLEAN;
+VAR pass: BOOLEAN;
+    expectedTypes: ARRAY 2 OF INTEGER;
+    expectedValues: ARRAY 2 OF ARRAY 32 OF CHAR;
 BEGIN
     pass := TRUE;
-    
-    HttpUrlTokenizer.Init(tokenizer, "http:");
-    
-    HttpUrlTokenizer.NextToken(tokenizer, token);
-    Tests.ExpectedInt(HttpUrlTokenizer.SchemeToken, token.type, "Scheme token type", pass);
-    DStrings.ToChars(token.value, value, res);
-    Tests.ExpectedString("http", value, "Scheme token value", pass);
-    
+    expectedTypes[0] := HttpUrlTokenizer.SchemeToken;
+    expectedTypes[1] := HttpUrlTokenizer.EofToken;
+    expectedValues[0] := "http";
+    expectedValues[1] := "";
+    RunTokenizerCase("http:", expectedTypes, expectedValues, "Basic scheme", pass);
     RETURN pass
 END TestBasicScheme;
 
 PROCEDURE TestSlashSlash*(): BOOLEAN;
-VAR
-    pass: BOOLEAN;
-    tokenizer: HttpUrlTokenizer.Tokenizer;
-    token: HttpUrlTokenizer.Token;
-    value: ARRAY 64 OF CHAR;
-    res: INTEGER;
+VAR pass: BOOLEAN;
+    expectedTypes: ARRAY 3 OF INTEGER;
+    expectedValues: ARRAY 3 OF ARRAY 32 OF CHAR;
 BEGIN
     pass := TRUE;
-    
-    HttpUrlTokenizer.Init(tokenizer, "//example.com");
-    
-    HttpUrlTokenizer.NextToken(tokenizer, token);
-    Tests.ExpectedInt(HttpUrlTokenizer.SlashSlashToken, token.type, "SlashSlash token type", pass);
-    DStrings.ToChars(token.value, value, res);
-    Tests.ExpectedString("//", value, "SlashSlash token value", pass);
-    
-    HttpUrlTokenizer.NextToken(tokenizer, token);
-    Tests.ExpectedInt(HttpUrlTokenizer.HostToken, token.type, "Host token type", pass);
-    DStrings.ToChars(token.value, value, res);
-    Tests.ExpectedString("example.com", value, "Host token value", pass);
-    
+    expectedTypes[0] := HttpUrlTokenizer.SlashSlashToken;
+    expectedTypes[1] := HttpUrlTokenizer.HostToken;
+    expectedTypes[2] := HttpUrlTokenizer.EofToken;
+    expectedValues[0] := "//";
+    expectedValues[1] := "example.com";
+    expectedValues[2] := "";
+    RunTokenizerCase("//example.com", expectedTypes, expectedValues, "SlashSlash", pass);
     RETURN pass
 END TestSlashSlash;
 
 PROCEDURE TestSimpleHost*(): BOOLEAN;
-VAR
-    pass: BOOLEAN;
-    tokenizer: HttpUrlTokenizer.Tokenizer;
-    token: HttpUrlTokenizer.Token;
-    value: ARRAY 64 OF CHAR;
-    res: INTEGER;
+VAR pass: BOOLEAN;
+    expectedTypes: ARRAY 2 OF INTEGER;
+    expectedValues: ARRAY 2 OF ARRAY 32 OF CHAR;
 BEGIN
     pass := TRUE;
-    
-    HttpUrlTokenizer.Init(tokenizer, "example.com");
-    
-    HttpUrlTokenizer.NextToken(tokenizer, token);
-    Tests.ExpectedInt(HttpUrlTokenizer.HostToken, token.type, "Simple host token type", pass);
-    DStrings.ToChars(token.value, value, res);
-    Tests.ExpectedString("example.com", value, "Simple host token value", pass);
-    
-    HttpUrlTokenizer.NextToken(tokenizer, token);
-    Tests.ExpectedInt(HttpUrlTokenizer.EofToken, token.type, "EOF after host", pass);
-    
+    expectedTypes[0] := HttpUrlTokenizer.HostToken;
+    expectedTypes[1] := HttpUrlTokenizer.EofToken;
+    expectedValues[0] := "example.com";
+    expectedValues[1] := "";
+    RunTokenizerCase("example.com", expectedTypes, expectedValues, "Simple host", pass);
     RETURN pass
 END TestSimpleHost;
 
 PROCEDURE TestPathOnly*(): BOOLEAN;
-VAR
-    pass: BOOLEAN;
-    tokenizer: HttpUrlTokenizer.Tokenizer;
-    token: HttpUrlTokenizer.Token;
-    value: ARRAY 64 OF CHAR;
-    res: INTEGER;
+VAR pass: BOOLEAN;
+    expectedTypes: ARRAY 1 OF INTEGER;
+    expectedValues: ARRAY 1 OF ARRAY 32 OF CHAR;
 BEGIN
     pass := TRUE;
-    
-    HttpUrlTokenizer.Init(tokenizer, "/path/to/file");
-    
-    HttpUrlTokenizer.NextToken(tokenizer, token);
-    Tests.ExpectedInt(HttpUrlTokenizer.PathToken, token.type, "Path only token type", pass);
-    DStrings.ToChars(token.value, value, res);
-    Tests.ExpectedString("/path/to/file", value, "Path only token value", pass);
-    
+    expectedTypes[0] := HttpUrlTokenizer.PathToken;
+    expectedValues[0] := "/path/to/file";
+    RunTokenizerCase("/path/to/file", expectedTypes, expectedValues, "Path only", pass);
     RETURN pass
 END TestPathOnly;
 
@@ -111,92 +99,43 @@ END TestUtilityFunctions;
 
 PROCEDURE TestFullURL*(): BOOLEAN;
 VAR pass: BOOLEAN;
-    tokenizer: HttpUrlTokenizer.Tokenizer;
-    token: HttpUrlTokenizer.Token;
-    value: ARRAY 64 OF CHAR;
-    res: INTEGER;
+    expectedTypes: ARRAY 16 OF INTEGER;
+    expectedValues: ARRAY 16 OF ARRAY 32 OF CHAR;
 BEGIN
     pass := TRUE;
-    HttpUrlTokenizer.Init(tokenizer, "https://example.com:8080/foo/bar?x=1&y=2#frag");
-
-    HttpUrlTokenizer.NextToken(tokenizer, token);
-    Tests.ExpectedInt(HttpUrlTokenizer.SchemeToken, token.type, "Scheme token type", pass);
-    DStrings.ToChars(token.value, value, res);
-    Tests.ExpectedString("https", value, "Scheme token value", pass);
-
-    HttpUrlTokenizer.NextToken(tokenizer, token);
-    Tests.ExpectedInt(HttpUrlTokenizer.SlashSlashToken, token.type, "SlashSlash token type", pass);
-    DStrings.ToChars(token.value, value, res);
-    Tests.ExpectedString("//", value, "SlashSlash token value", pass);
-
-    HttpUrlTokenizer.NextToken(tokenizer, token);
-    Tests.ExpectedInt(HttpUrlTokenizer.HostToken, token.type, "Host token type", pass);
-    DStrings.ToChars(token.value, value, res);
-    Tests.ExpectedString("example.com", value, "Host token value", pass);
-
-    HttpUrlTokenizer.NextToken(tokenizer, token);
-    Tests.ExpectedInt(HttpUrlTokenizer.PortToken, token.type, "Port token type", pass);
-    DStrings.ToChars(token.value, value, res);
-    Tests.ExpectedString("8080", value, "Port token value", pass);
-
-    HttpUrlTokenizer.NextToken(tokenizer, token);
-    Tests.ExpectedInt(HttpUrlTokenizer.PathToken, token.type, "Path token type", pass);
-    DStrings.ToChars(token.value, value, res);
-    Tests.ExpectedString("/foo/bar", value, "Path token value", pass);
-
-    HttpUrlTokenizer.NextToken(tokenizer, token);
-    Tests.ExpectedInt(HttpUrlTokenizer.QueryStartToken, token.type, "Query start token type", pass);
-    DStrings.ToChars(token.value, value, res);
-    Tests.ExpectedString("?", value, "Query start token value", pass);
-
-    HttpUrlTokenizer.NextToken(tokenizer, token);
-    Tests.ExpectedInt(HttpUrlTokenizer.QueryKeyToken, token.type, "Query key token type", pass);
-    DStrings.ToChars(token.value, value, res);
-    Tests.ExpectedString("x", value, "Query key token value", pass);
-
-    HttpUrlTokenizer.NextToken(tokenizer, token);
-    Tests.ExpectedInt(HttpUrlTokenizer.QueryEqualsToken, token.type, "Query equals token type", pass);
-    DStrings.ToChars(token.value, value, res);
-    Tests.ExpectedString("=", value, "Query equals token value", pass);
-
-    HttpUrlTokenizer.NextToken(tokenizer, token);
-    Tests.ExpectedInt(HttpUrlTokenizer.QueryValueToken, token.type, "Query value token type", pass);
-    DStrings.ToChars(token.value, value, res);
-    Tests.ExpectedString("1", value, "Query value token value", pass);
-
-    HttpUrlTokenizer.NextToken(tokenizer, token);
-    Tests.ExpectedInt(HttpUrlTokenizer.QuerySeparatorToken, token.type, "Query separator token type", pass);
-    DStrings.ToChars(token.value, value, res);
-    Tests.ExpectedString("&", value, "Query separator token value", pass);
-
-    HttpUrlTokenizer.NextToken(tokenizer, token);
-    Tests.ExpectedInt(HttpUrlTokenizer.QueryKeyToken, token.type, "Query key2 token type", pass);
-    DStrings.ToChars(token.value, value, res);
-    Tests.ExpectedString("y", value, "Query key2 token value", pass);
-
-    HttpUrlTokenizer.NextToken(tokenizer, token);
-    Tests.ExpectedInt(HttpUrlTokenizer.QueryEqualsToken, token.type, "Query equals2 token type", pass);
-    DStrings.ToChars(token.value, value, res);
-    Tests.ExpectedString("=", value, "Query equals2 token value", pass);
-
-    HttpUrlTokenizer.NextToken(tokenizer, token);
-    Tests.ExpectedInt(HttpUrlTokenizer.QueryValueToken, token.type, "Query value2 token type", pass);
-    DStrings.ToChars(token.value, value, res);
-    Tests.ExpectedString("2", value, "Query value2 token value", pass);
-
-    HttpUrlTokenizer.NextToken(tokenizer, token);
-    Tests.ExpectedInt(HttpUrlTokenizer.FragmentStartToken, token.type, "Fragment start token type", pass);
-    DStrings.ToChars(token.value, value, res);
-    Tests.ExpectedString("#", value, "Fragment start token value", pass);
-
-    HttpUrlTokenizer.NextToken(tokenizer, token);
-    Tests.ExpectedInt(HttpUrlTokenizer.FragmentToken, token.type, "Fragment token type", pass);
-    DStrings.ToChars(token.value, value, res);
-    Tests.ExpectedString("frag", value, "Fragment token value", pass);
-
-    HttpUrlTokenizer.NextToken(tokenizer, token);
-    Tests.ExpectedInt(HttpUrlTokenizer.EofToken, token.type, "EOF after full URL", pass);
-
+    expectedTypes[0] := HttpUrlTokenizer.SchemeToken;
+    expectedTypes[1] := HttpUrlTokenizer.SlashSlashToken;
+    expectedTypes[2] := HttpUrlTokenizer.HostToken;
+    expectedTypes[3] := HttpUrlTokenizer.PortToken;
+    expectedTypes[4] := HttpUrlTokenizer.PathToken;
+    expectedTypes[5] := HttpUrlTokenizer.QueryStartToken;
+    expectedTypes[6] := HttpUrlTokenizer.QueryKeyToken;
+    expectedTypes[7] := HttpUrlTokenizer.QueryEqualsToken;
+    expectedTypes[8] := HttpUrlTokenizer.QueryValueToken;
+    expectedTypes[9] := HttpUrlTokenizer.QuerySeparatorToken;
+    expectedTypes[10] := HttpUrlTokenizer.QueryKeyToken;
+    expectedTypes[11] := HttpUrlTokenizer.QueryEqualsToken;
+    expectedTypes[12] := HttpUrlTokenizer.QueryValueToken;
+    expectedTypes[13] := HttpUrlTokenizer.FragmentStartToken;
+    expectedTypes[14] := HttpUrlTokenizer.FragmentToken;
+    expectedTypes[15] := HttpUrlTokenizer.EofToken;
+    expectedValues[0] := "https";
+    expectedValues[1] := "//";
+    expectedValues[2] := "example.com";
+    expectedValues[3] := "8080";
+    expectedValues[4] := "/foo/bar";
+    expectedValues[5] := "?";
+    expectedValues[6] := "x";
+    expectedValues[7] := "=";
+    expectedValues[8] := "1";
+    expectedValues[9] := "&";
+    expectedValues[10] := "y";
+    expectedValues[11] := "=";
+    expectedValues[12] := "2";
+    expectedValues[13] := "#";
+    expectedValues[14] := "frag";
+    expectedValues[15] := "";
+    RunTokenizerCase("https://example.com:8080/foo/bar?x=1&y=2#frag", expectedTypes, expectedValues, "Full URL", pass);
     RETURN pass
 END TestFullURL;
 
