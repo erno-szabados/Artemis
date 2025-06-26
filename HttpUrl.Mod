@@ -1,14 +1,9 @@
-(** HttpUrlTokenizer.Mod - Character-based tokenizer for HTTP URLs.
-
-Copyright (C) 2025 Artemis Project Contributors
-
-Released under The 3-Clause BSD License.
-*)
-
-MODULE HttpUrl;
-
 (** 
   HttpUrl - URL parsing and manipulation module 
+
+  Copyright (C) 2025 Artemis Project Contributors
+
+  Released under The 3-Clause BSD License.
 
   This module provides functionality to parse URLs, serialize them back to strings,
   and manipulate query parameters. It uses the DStrings module for string handling
@@ -18,6 +13,7 @@ MODULE HttpUrl;
   - Does not support percent-encoding (e.g., "%20" for spaces).
   - Does not handle Unicode characters in URLs.
   *)
+MODULE HttpUrl;
 
 IMPORT DStrings, HttpUrlTokenizer;
 
