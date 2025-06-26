@@ -1,6 +1,6 @@
 MODULE HttpUrl;
 
-IMPORT DStrings, HttpUrlTokenizer, Out;
+IMPORT DStrings, HttpUrlTokenizer;
 
 TYPE
   Url* = POINTER TO UrlDesc;
@@ -54,7 +54,6 @@ VAR
     newUrl: Url;
     queryParts: DStrings.String;
     pathParts: DStrings.String;
-    fragParts: DStrings.String;
     expectingValue: BOOLEAN;
     lastKey: DStrings.String;
 BEGIN
