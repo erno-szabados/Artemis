@@ -11,7 +11,7 @@
 *)
 MODULE HttpHeader;
 
-IMPORT DStrings, Dictionary, Collections;
+IMPORT DStrings, Dictionary, Collections, Chars;
 
 CONST
   MaxKeyLength = 256; (* Maximum length for header keys *)
@@ -21,6 +21,12 @@ TYPE
   Header* = POINTER TO HeaderDesc;
   HeaderDesc = RECORD
     fields: Dictionary.Dictionary
+  END;
+(*
+  Helper state for header serialization, holding the output rider.
+*)
+  WriteHeaderState = RECORD (Dictionary.DictVisitorState)
+    rider: DStrings.Rider
   END;
 
 (**
@@ -47,19 +53,21 @@ END Parse;
 
 (*
   Helper procedure to write a single header field as "Key: Value\r\n" for serialization.
+  Uses the output rider from the visitor state.
 *)
 PROCEDURE WriteHeader(key: ARRAY OF CHAR; value: Collections.ItemPtr; VAR state: Collections.VisitorState): BOOLEAN;
 VAR
   val: DStrings.String;
-  rider: DStrings.Rider;
+  ws: WriteHeaderState;
 BEGIN
+  ws := state(WriteHeaderState);
   IF value IS DStrings.String THEN
     val := value(DStrings.String);
-    DStrings.Set(rider, val, DStrings.Length(val));
-    DStrings.WriteString(rider, key);
-    DStrings.WriteString(rider, ": ");
-    DStrings.WriteDString(rider, val);
-    DStrings.WriteString(rider, "\r\n")
+    DStrings.WriteString(ws.rider, key);
+    DStrings.WriteString(ws.rider, ": ");
+    DStrings.WriteDString(ws.rider, val);
+    DStrings.WriteChar(ws.rider, Chars.CR);
+    DStrings.WriteChar(ws.rider, Chars.LF)
   END;
   RETURN TRUE
 END WriteHeader;
@@ -71,14 +79,11 @@ END WriteHeader;
 PROCEDURE ToString*(h: Header; VAR out: DStrings.String): BOOLEAN;
 VAR
   result: BOOLEAN;
-  state: Dictionary.DictVisitorState;
-  rider: DStrings.Rider;
-  first: BOOLEAN;
+  state: WriteHeaderState;
 BEGIN
   result := FALSE;
   DStrings.Init("", out);
-  DStrings.Set(rider, out, 0);
-  first := TRUE;
+  DStrings.Set(state.rider, out, 0);
   Dictionary.ForeachString(h.fields, WriteHeader, state);
   result := TRUE;
   RETURN result

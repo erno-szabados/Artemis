@@ -1,6 +1,6 @@
 MODULE HttpHeaderTest;
 
-IMPORT HttpHeader, Tests, DStrings;
+IMPORT HttpHeader, Tests, DStrings, Out, Chars;
 
 VAR
   ts : Tests.TestSet;
@@ -52,25 +52,46 @@ BEGIN
   RETURN pass
 END TestRemove;
 
+PROCEDURE AppendCRLF(VAR s: DStrings.String);
+VAR r: DStrings.Rider;
+BEGIN
+  DStrings.Set(r, s, DStrings.Length(s));
+  DStrings.WriteChar(r, Chars.CR);
+  DStrings.WriteChar(r, Chars.LF)
+END AppendCRLF;
+
 PROCEDURE TestToString*(): BOOLEAN;
 VAR
   pass: BOOLEAN;
   h: HttpHeader.Header;
   out, expected: DStrings.String;
   ok: BOOLEAN;
+  buf: ARRAY 256 OF CHAR;
+  res: INTEGER;
+  tmp: DStrings.String;
+  r: DStrings.Rider;
+  match: BOOLEAN;
 BEGIN
   pass := TRUE;
   HttpHeader.Init(h);
   ok := HttpHeader.Set(h, "Content-Type", "text/plain");
   ok := HttpHeader.Set(h, "X-Test", "foo");
   ok := HttpHeader.ToString(h, out);
-  (* The order of fields is not guaranteed, so check for both possible orderings *)
-  DStrings.Init("Content-Type: text/plain\r\nX-Test: foo\r\n", expected);
-  IF DStrings.Equal(out, expected) THEN
-    Tests.ExpectedBool(TRUE, TRUE, "ToString output matches (order 1)", pass)
+  (* The order of fields is not guaranteed, so check for both possible orderings, and expect uppercase keys *)
+  DStrings.Init("CONTENT-TYPE: text/plain", expected); AppendCRLF(expected);
+  DStrings.Init("X-TEST: foo", tmp); DStrings.Set(r, expected, DStrings.Length(expected)); DStrings.WriteDString(r, tmp); AppendCRLF(expected);
+  match := DStrings.Equal(out, expected);
+  IF ~match THEN
+    DStrings.Init("X-TEST: foo", expected); AppendCRLF(expected);
+    DStrings.Init("CONTENT-TYPE: text/plain", tmp); DStrings.Set(r, expected, DStrings.Length(expected)); DStrings.WriteDString(r, tmp); AppendCRLF(expected);
+    match := DStrings.Equal(out, expected);
+  END;
+  IF ~match THEN
+    DStrings.ToChars(out, buf, res);
+    Out.String("Header: ["); Out.String(buf); Out.String("]"); Out.Ln;
+    Tests.ExpectedBool(TRUE, FALSE, "ToString output does not match any expected order", pass)
   ELSE
-    DStrings.Init("X-Test: foo\r\nContent-Type: text/plain\r\n", expected);
-    Tests.ExpectedBool(DStrings.Equal(out, expected), TRUE, "ToString output matches (order 2)", pass)
+    Tests.ExpectedBool(TRUE, TRUE, "ToString output matches expected order (uppercase)", pass)
   END;
   RETURN pass
 END TestToString;
