@@ -14,7 +14,7 @@ TYPE
   END;
 
 (* Internal: Dump token information *)
-PROCEDURE DumpToken(token: HttpUrlTokenizer.Token);
+(* PROCEDURE DumpToken(token: HttpUrlTokenizer.Token);
 VAR 
   buf : ARRAY 256 OF CHAR;
   truncated: INTEGER;
@@ -26,7 +26,7 @@ BEGIN
   Out.String(buf);
   Out.String("]");
   Out.Ln();
-END DumpToken;
+END DumpToken; *)
 
 (* Internal: Convert DStrings.String to integer *)
 PROCEDURE StringToInt(s: DStrings.String): INTEGER;
@@ -79,7 +79,8 @@ BEGIN
     WHILE ~HttpUrlTokenizer.AtEof(tokenizer) DO
         HttpUrlTokenizer.NextToken(tokenizer, token);
 
-        DumpToken(token);
+        (* Helper for debugging *)
+        (* DumpToken(token); *)
         
         IF token.type = HttpUrlTokenizer.ErrorToken THEN
             (* Parsing error occurred *)
