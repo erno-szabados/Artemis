@@ -146,72 +146,45 @@ BEGIN
   RETURN result
 END Remove;
 
-(* Internal: Reads a line from the reader into line, sets lineLen. Handles CR/LF. *)
-PROCEDURE ReadLine(VAR reader: DStrings.Rider; VAR line: ARRAY OF CHAR; VAR lineLen: INTEGER);
-VAR c: CHAR;
+(* Internal: Reads a line from the reader into a DStrings.String, sets lineLen. Handles CR/LF. *)
+PROCEDURE ReadLineString(VAR reader: DStrings.Rider; VAR line: DStrings.String; VAR lineLen: INTEGER);
+VAR c: CHAR; outRider: DStrings.Rider; done: BOOLEAN;
 BEGIN
-  lineLen := 0;
+  DStrings.Clear(line);
+  DStrings.Set(outRider, line, 0);
+  done := FALSE;
   c := DStrings.Get(reader);
-  WHILE (c # 0X) & (c # 0AX) & (lineLen < LEN(line) - 1) DO
-    IF c # 0DX THEN
-      line[lineLen] := c;
-      INC(lineLen)
-    END;
-    c := DStrings.Get(reader)
-  END;
-  line[lineLen] := 0X
-END ReadLine;
-
-(* Internal: Copies chars from src[srcStart] for count chars into dest. *)
-PROCEDURE CopyChars(src: ARRAY OF CHAR; srcStart, count: INTEGER; VAR dest: ARRAY OF CHAR);
-VAR k: INTEGER;
-BEGIN
-  FOR k := 0 TO count-1 DO dest[k] := src[srcStart+k] END;
-  dest[count] := 0X
-END CopyChars;
-
-(* Internal: Trims leading and trailing spaces from s in place. *)
-PROCEDURE TrimSpaces(VAR s: ARRAY OF CHAR);
-VAR i, j, len: INTEGER; tmp: ARRAY 512 OF CHAR;
-BEGIN
-  len := 0;
-  WHILE (s[len] # 0X) DO INC(len) END;
-  i := 0;
-  WHILE (i < len) & (s[i] = " ") DO INC(i) END;
-  j := len;
-  WHILE (j > i) & (s[j-1] = " ") DO DEC(j) END;
-  IF j > i THEN
-    CopyChars(s, i, j-i, tmp);
-    CopyChars(tmp, 0, j-i, s);
-    s[j-i] := 0X
-  ELSE
-    s[0] := 0X
-  END
-END TrimSpaces;
-
-(* Internal: Splits line at first colon, trims key and value, sets valid. *)
-PROCEDURE SplitHeaderLine(line: ARRAY OF CHAR; lineLen: INTEGER; VAR key, value: ARRAY OF CHAR; VAR valid: BOOLEAN);
-VAR colonPos, i, j: INTEGER;
-BEGIN
-  valid := FALSE;
-  colonPos := -1;
-  FOR i := 0 TO lineLen-1 DO
-    IF line[i] = ":" THEN
-      colonPos := i;
-      i := lineLen
+  WHILE (c # 0X) & (c # Chars.LF) & ~done DO
+    IF c # Chars.CR THEN
+      DStrings.Put(outRider, c);
+      c := DStrings.Get(reader)
+    ELSE
+      (* If CR, check for CRLF and stop, else skip CR *)
+      c := DStrings.Get(reader);
+      IF (c = 0X) OR (c = Chars.LF) THEN
+        done := TRUE
+      END
     END
   END;
-  IF colonPos > 0 THEN
-    FOR i := 0 TO colonPos-1 DO key[i] := line[i] END;
-    key[colonPos] := 0X;
-    TrimSpaces(key);
-    j := 0;
-    FOR i := colonPos+1 TO lineLen-1 DO value[j] := line[i]; INC(j) END;
-    value[j] := 0X;
-    TrimSpaces(value);
+  lineLen := DStrings.Length(line)
+END ReadLineString;
+
+(* Internal: Splits a DStrings.String line at first colon, trims key and value, sets valid. *)
+PROCEDURE SplitHeaderLineString(line: DStrings.String; VAR key, value: DStrings.String; VAR valid: BOOLEAN);
+VAR colonPos, len: INTEGER; colon: DStrings.String;
+BEGIN
+  valid := FALSE;
+  len := DStrings.Length(line);
+  DStrings.Init("", key); DStrings.Init("", value); DStrings.Init(":", colon);
+  colonPos := DStrings.Pos(colon, line, 0);
+  IF (colonPos > 0) & (colonPos < len) THEN
+    DStrings.Extract(line, 0, colonPos, key);
+    DStrings.Extract(line, colonPos+1, len-colonPos-1, value);
+    DStrings.TrimSpace(key);
+    DStrings.TrimSpace(value);
     valid := TRUE
   END
-END SplitHeaderLine;
+END SplitHeaderLineString;
 
 (**
   Parses raw HTTP header text into the header structure. Returns TRUE on success.
@@ -222,22 +195,25 @@ VAR
   result: BOOLEAN;
   input: DStrings.String;
   reader: DStrings.Rider;
-  line: ARRAY 2048 OF CHAR;
-  key, value: ARRAY 512 OF CHAR;
+  line, key, value: DStrings.String;
   lineLen: INTEGER;
   valid, success: BOOLEAN;
+  keyBuf, valueBuf: ARRAY 512 OF CHAR;
 BEGIN
   result := FALSE;
   IF h # NIL THEN
     DStrings.Init(raw, input);
     DStrings.Set(reader, input, 0);
+    DStrings.Init("", line); DStrings.Init("", key); DStrings.Init("", value);
     success := TRUE;
     WHILE (DStrings.Peek(reader) # 0X) & success DO
-      ReadLine(reader, line, lineLen);
+      ReadLineString(reader, line, lineLen);
       IF lineLen > 0 THEN
-        SplitHeaderLine(line, lineLen, key, value, valid);
+        SplitHeaderLineString(line, key, value, valid);
         IF valid THEN
-          success := Set(h, key, value)
+          DStrings.ToChars(key, keyBuf, lineLen);
+          DStrings.ToChars(value, valueBuf, lineLen);
+          success := Set(h, keyBuf, valueBuf)
         END
       END
     END;
