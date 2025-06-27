@@ -87,12 +87,13 @@ BEGIN
     match := DStrings.Equal(out, expected);
   END;
   IF ~match THEN
-    DStrings.ToChars(out, buf, res);
-    Out.String("Header: ["); Out.String(buf); Out.String("]"); Out.Ln;
     Tests.ExpectedBool(TRUE, FALSE, "ToString output does not match any expected order", pass)
   ELSE
     Tests.ExpectedBool(TRUE, TRUE, "ToString output matches expected order (uppercase)", pass)
   END;
+
+  DStrings.ToChars(out, buf, res);
+  Out.String("Header: ["); Out.Ln; Out.String(buf); Out.String("]"); Out.Ln;
   RETURN pass
 END TestToString;
 
@@ -176,6 +177,6 @@ BEGIN
   Tests.Add(ts, TestSetGet);
   Tests.Add(ts, TestRemove);
   Tests.Add(ts, TestToString);
-  (* Tests.Add(ts, TestParse); *)
+  Tests.Add(ts, TestParse);
   ASSERT(Tests.Run(ts))
 END HttpHeaderTest.
