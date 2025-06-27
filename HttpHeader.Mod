@@ -14,10 +14,12 @@ MODULE HttpHeader;
 IMPORT DStrings, Dictionary, Collections, Chars;
 
 CONST
-  MaxKeyLength = 256; (* Maximum length for header keys *)
+  (** Maximum length for header keys *)
+  MaxKeyLength* = 256; 
 
 
 TYPE
+ (* HTTP header descriptor *)
   Header* = POINTER TO HeaderDesc;
   HeaderDesc = RECORD
     fields: Dictionary.Dictionary
@@ -213,7 +215,7 @@ VAR
   reader: DStrings.Rider;
   line, key, value: DStrings.String;
   lineLen: INTEGER;
-  valid, success: BOOLEAN;
+  valid, ok: BOOLEAN;
   keyBuf, valueBuf: DStrings.String;
 BEGIN
   result := FALSE;
@@ -221,8 +223,8 @@ BEGIN
     DStrings.Init(raw, input);
     DStrings.Set(reader, input, 0);
     DStrings.Init("", line); DStrings.Init("", key); DStrings.Init("", value);
-    success := TRUE;
-    WHILE (DStrings.Peek(reader) # 0X) & success DO
+    ok := TRUE;
+    WHILE (DStrings.Peek(reader) # 0X) & ok DO
       ReadLineString(reader, line, lineLen);
       IF lineLen > 0 THEN
         SplitHeaderLineString(line, key, value, valid);
@@ -231,11 +233,11 @@ BEGIN
           DStrings.Copy(key, keyBuf);
           DStrings.Copy(value, valueBuf);
           (* Normalize key to uppercase for case-insensitive storage *)
-          success := SetDString(h, keyBuf, valueBuf)
+          ok := SetDString(h, keyBuf, valueBuf)
         END
       END
     END;
-    IF success THEN
+    IF ok THEN
       result := TRUE
     END
   END;

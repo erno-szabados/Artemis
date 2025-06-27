@@ -10,17 +10,12 @@
 		<p><a href='index.html'>Index</a></p>
 
 		<pre>
-<span class='comment'>(* HttpUrlTokenizer.Mod - Character-based tokenizer for HTTP URLs.
-
-Copyright (C) 2025 Artemis Project Contributors
-
-Released under The 3-Clause BSD License.
-*)</span>
-
-DEFINITION <em>HttpUrl</em>;
-
 <span class='comment'>(* 
   HttpUrl - URL parsing and manipulation module 
+
+  Copyright (C) 2025 Artemis Project Contributors
+
+  Released under The 3-Clause BSD License.
 
   This module provides functionality to parse URLs, serialize them back to strings,
   and manipulate query parameters. It uses the DStrings module for string handling
@@ -30,6 +25,7 @@ DEFINITION <em>HttpUrl</em>;
   - Does not support percent-encoding (e.g., "%20" for spaces).
   - Does not handle Unicode characters in URLs.
   *)</span>
+DEFINITION <em>HttpUrl</em>;
 
 IMPORT DStrings;
 

@@ -1,0 +1,11 @@
+DEFINITION HttpHeaderTest;
+
+PROCEDURE TestInit(): BOOLEAN;
+
+PROCEDURE TestSetGet(): BOOLEAN;
+
+PROCEDURE TestRemove(): BOOLEAN;
+
+PROCEDURE TestToString(): BOOLEAN;
+
+END HttpHeaderTest.

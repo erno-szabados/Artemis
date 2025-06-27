@@ -1,0 +1,75 @@
+<!DOCTYPE html PUBLIC '-//W3C//DTD XHTML 1.0 Strict//EN' 'http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd'>
+<html xmlns='http://www.w3.org/1999/xhtml' xml:lang='en' lang='en'>
+	<head>
+		<meta name='viewport' content='width=device-width, initial-scale=1.0' />
+		<meta http-equiv='Content-Type' content='text/html; charset=utf-8' />
+		<title>DEFINITION HttpHeader</title>
+		<link rel='stylesheet' type='text/css' href='style.css' />
+	</head>
+	<body>
+		<p><a href='index.html'>Index</a></p>
+
+		<pre>
+<span class='comment'>(*
+  HttpHeader - HTTP header parsing and manipulation module
+
+  Copyright (C) 2025 Artemis Project Contributors
+
+  Released under The 3-Clause BSD License.
+
+  This module provides functionality to parse, store, manipulate, and serialize HTTP headers.
+  It uses the DStrings module for string handling and the Dictionary module for key-value storage.
+  Header field names are handled case-insensitively by normalizing to uppercase.
+*)</span>
+DEFINITION <em>HttpHeader</em>;
+
+IMPORT DStrings, Dictionary;
+
+CONST
+  <span class='comment'>(* Maximum length for header keys *)</span>
+  MaxKeyLength = 256; 
+
+TYPE
+  Header = POINTER TO HeaderDesc;
+
+<span class='comment'>(*
+  Initializes a new, empty HTTP header structure.
+*)</span>
+PROCEDURE <em>Init</em>(VAR h: Header);
+
+<span class='comment'>(**
+  Serializes the header fields into a string suitable for sending over HTTP.
+  Returns TRUE on success.
+*)</span>
+PROCEDURE <em>ToString</em>(h: Header; VAR out: DStrings.String): BOOLEAN;
+
+<span class='comment'>(*
+  Retrieves the value for a given header key (case-insensitive). Returns TRUE if found.
+*)</span>
+PROCEDURE <em>Get</em>(h: Header; key: ARRAY OF CHAR; VAR value: DStrings.String): BOOLEAN;
+
+<span class='comment'>(*
+  Sets or updates a header field (case-insensitive). Returns TRUE on success.
+*)</span>
+PROCEDURE <em>Set</em>(h: Header; key, value: ARRAY OF CHAR): BOOLEAN;
+
+<span class='comment'>(*
+  Removes a header field (case-insensitive). Returns TRUE if removed.
+*)</span>
+PROCEDURE <em>Remove</em>(h: Header; key: ARRAY OF CHAR): BOOLEAN;
+
+<span class='comment'>(*
+  Parses raw HTTP header text into the header structure. Returns TRUE on success.
+  Handles line splitting, key/value separation, whitespace trimming, and case normalization.
+*)</span>
+PROCEDURE <em>Parse</em>(raw: ARRAY OF CHAR; VAR h: Header): BOOLEAN;
+
+<span class='comment'>(*
+  Iterates over all header fields, calling the provided visitor procedure.
+*)</span>
+PROCEDURE <em>Foreach</em>(h: Header; visit: Dictionary.StringKeyVisitProc; VAR state: Dictionary.DictVisitorState);
+
+END HttpHeader.
+</pre>
+	</body>
+</html>

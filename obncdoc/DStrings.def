@@ -35,7 +35,7 @@ CONST
 TYPE
   (* String, StringDesc implements a data structure to provide
       dynamic string in Oberon-7 type. NOTE: In memory the
-      implentation is currently a private linked list of CHAR. *)
+      implementation is currently a private linked list of CHAR. *)
   String     = POINTER TO StringDesc;
   StringDesc = RECORD (Collections.Item) END;
 
@@ -271,7 +271,7 @@ PROCEDURE WriteBytes(VAR r : Rider; buf : ARRAY OF BYTE; n : INTEGER);
 PROCEDURE WriteSet(VAR r : Rider; value : SET);
 
 (*WriteFixed writes a renumber with a fixed number of decimal places
-   to a string. E.g. write out dollar ammounts as 1.32 rather then E
+   to a string. E.g. write out dollar amounts as 1.32 rather then E
    notation *)
 PROCEDURE WriteFixed(VAR r : Rider; value : REAL; n : INTEGER);
 
