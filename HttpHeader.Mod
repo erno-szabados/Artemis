@@ -89,6 +89,7 @@ BEGIN
   result := FALSE;
   IF h # NIL THEN
     DStrings.Init(key, normKey);
+    DStrings.Init("", value);
     DStrings.Cap(normKey); (* Normalize to uppercase for case-insensitive lookup *)
     DStrings.ToChars(normKey, keyBuf, res);
     found := Dictionary.GetString(h.fields, keyBuf, item);
@@ -226,8 +227,10 @@ BEGIN
       IF lineLen > 0 THEN
         SplitHeaderLineString(line, key, value, valid);
         IF valid THEN
+          DStrings.Clear(keyBuf); DStrings.Clear(valueBuf);
           DStrings.Copy(key, keyBuf);
           DStrings.Copy(value, valueBuf);
+          (* Normalize key to uppercase for case-insensitive storage *)
           success := SetDString(h, keyBuf, valueBuf)
         END
       END

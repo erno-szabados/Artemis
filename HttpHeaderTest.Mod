@@ -1,6 +1,6 @@
 MODULE HttpHeaderTest;
 
-IMPORT HttpHeader, Tests, DStrings, Out, Chars;
+IMPORT HttpHeader, Tests, DStrings, Chars;
 
 VAR
   ts : Tests.TestSet;
@@ -66,8 +66,6 @@ VAR
   h: HttpHeader.Header;
   out, expected: DStrings.String;
   ok: BOOLEAN;
-  buf: ARRAY 256 OF CHAR;
-  res: INTEGER;
   tmp: DStrings.String;
   r: DStrings.Rider;
   match: BOOLEAN;
@@ -92,8 +90,6 @@ BEGIN
     Tests.ExpectedBool(TRUE, TRUE, "ToString output matches expected order (uppercase)", pass)
   END;
 
-  DStrings.ToChars(out, buf, res);
-  Out.String("Header: ["); Out.Ln; Out.String(buf); Out.String("]"); Out.Ln;
   RETURN pass
 END TestToString;
 
@@ -132,16 +128,21 @@ BEGIN
   (* Test retrieved values (case-insensitive) *)
   ok := HttpHeader.Get(h, "content-type", value);
   Tests.ExpectedBool(TRUE, ok, "Get content-type should succeed", pass);
+  Chars.Clear(valueBuf);
   DStrings.ToChars(value, valueBuf, res);
   Tests.ExpectedString("text/html", valueBuf, "content-type value", pass);
   
+
   ok := HttpHeader.Get(h, "CONTENT-LENGTH", value);
   Tests.ExpectedBool(TRUE, ok, "Get CONTENT-LENGTH should succeed", pass);
+  Chars.Clear(valueBuf);
   DStrings.ToChars(value, valueBuf, res);
   Tests.ExpectedString("1234", valueBuf, "content-length value", pass);
   
+
   ok := HttpHeader.Get(h, "x-custom-header", value);
   Tests.ExpectedBool(TRUE, ok, "Get x-custom-header should succeed", pass);
+  Chars.Clear(valueBuf);
   DStrings.ToChars(value, valueBuf, res);
   Tests.ExpectedString("custom value", valueBuf, "custom header value", pass);
   
