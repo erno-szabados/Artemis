@@ -34,7 +34,6 @@ VAR
     intKey: CollectionKeys.IntegerKeyPtr;
     key: INTEGER;
     value: Collections.ItemPtr;
-    dictState: DictVisitorState;
     result: BOOLEAN;
 BEGIN
     pair := item(HashMap.KeyValuePairPtr);
@@ -42,8 +41,7 @@ BEGIN
     intKey := keyPtr(CollectionKeys.IntegerKeyPtr);
     key := intKey.value;
     value := HashMap.PairValue(pair);
-    dictState := state(DictVisitorState);
-    result := dictState.intVisitor(key, value, state);
+    result := state(DictVisitorState).intVisitor(key, value, state);
     RETURN result
 END IntKeyAdapter;
 
@@ -54,15 +52,13 @@ VAR
     keyPtr: CollectionKeys.KeyPtr;
     strKey: CollectionKeys.StringKeyPtr;
     value: Collections.ItemPtr;
-    dictState: DictVisitorState;
     result: BOOLEAN;
 BEGIN
     pair := item(HashMap.KeyValuePairPtr);
     keyPtr := HashMap.PairKey(pair);
     strKey := keyPtr(CollectionKeys.StringKeyPtr);
     value := HashMap.PairValue(pair);
-    dictState := state(DictVisitorState);
-    result := dictState.stringVisitor(strKey.value, value, state);
+    result := state(DictVisitorState).stringVisitor(strKey.value, value, state);
     RETURN result
 END StringKeyAdapter;
 
