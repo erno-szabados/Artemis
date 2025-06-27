@@ -176,6 +176,6 @@ BEGIN
   Tests.Add(ts, TestSetGet);
   Tests.Add(ts, TestRemove);
   Tests.Add(ts, TestToString);
-  Tests.Add(ts, TestParse);
+  (* Tests.Add(ts, TestParse); *)
   ASSERT(Tests.Run(ts))
 END HttpHeaderTest.

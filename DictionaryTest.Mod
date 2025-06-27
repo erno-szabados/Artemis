@@ -7,7 +7,7 @@ Released under The 3-Clause BSD License.
 
 MODULE DictionaryTest;
 
-IMPORT Dictionary, Collections, Tests;
+IMPORT Dictionary, Collections, Tests, Out;
 
 TYPE
     TestItem = RECORD(Collections.Item)
@@ -19,7 +19,13 @@ TYPE
         sum: INTEGER;
         count: INTEGER
     END;
-
+    
+    (* State for testing position preservation across visitor calls *)
+    BuildStringState = RECORD(Dictionary.DictVisitorState)
+        buffer: ARRAY 256 OF CHAR;
+        pos: INTEGER;
+        count: INTEGER
+    END;
 VAR
     ts: Tests.TestSet;
 
@@ -274,6 +280,155 @@ BEGIN
     RETURN pass
 END TestStringForeach;
 
+(* Dumps all keys and values from a string-keyed dictionary *)
+PROCEDURE DumpVisitor(key: ARRAY OF CHAR; value: Collections.ItemPtr; VAR state: Collections.VisitorState): BOOLEAN;
+VAR item: TestItemPtr;
+BEGIN
+    item := value(TestItemPtr);
+    Out.String("Key: "); Out.String(key); Out.String(", Value: "); Out.Int(item.value, 0); Out.Ln;
+    RETURN TRUE
+END DumpVisitor;
+
+PROCEDURE TestDumpStringDict*(): BOOLEAN;
+VAR 
+    dict: Dictionary.Dictionary;
+    state : Dictionary.DictVisitorState; 
+    pass: BOOLEAN;
+BEGIN
+    pass := TRUE;
+    dict := Dictionary.NewStringDict();
+    Dictionary.PutString(dict, "alpha", NewTestItem(1));
+    Dictionary.PutString(dict, "beta", NewTestItem(2));
+    Dictionary.PutString(dict, "gamma", NewTestItem(3));
+    Out.String("Dumping all keys and values in string dictionary:"); Out.Ln;
+    Dictionary.ForeachString(dict, DumpVisitor, state);
+    Dictionary.Free(dict);
+    RETURN pass
+END TestDumpStringDict;
+
+(* Test visitor that builds a string by appending each key-value pair *)
+PROCEDURE BuildStringVisitor(key: ARRAY OF CHAR; value: Collections.ItemPtr; VAR state: Collections.VisitorState): BOOLEAN;
+VAR 
+    item: TestItemPtr;
+    i: INTEGER;
+BEGIN
+    item := value(TestItemPtr);
+    
+    (* Work directly with state parameter to avoid copying *)
+    (* Append "key:value;" to the buffer *)
+    i := 0;
+    WHILE (state(BuildStringState).pos < LEN(state(BuildStringState).buffer) - 1) & (i < LEN(key)) & (key[i] # 0X) DO
+        state(BuildStringState).buffer[state(BuildStringState).pos] := key[i];
+        INC(state(BuildStringState).pos);
+        INC(i)
+    END;
+    
+    IF state(BuildStringState).pos < LEN(state(BuildStringState).buffer) - 1 THEN
+        state(BuildStringState).buffer[state(BuildStringState).pos] := ":";
+        INC(state(BuildStringState).pos)
+    END;
+    
+    (* Convert integer to string manually *)
+    IF item.value < 10 THEN
+        IF state(BuildStringState).pos < LEN(state(BuildStringState).buffer) - 1 THEN
+            state(BuildStringState).buffer[state(BuildStringState).pos] := CHR(ORD("0") + item.value);
+            INC(state(BuildStringState).pos)
+        END
+    ELSE
+        (* Simple case for two-digit numbers *)
+        IF state(BuildStringState).pos < LEN(state(BuildStringState).buffer) - 2 THEN
+            state(BuildStringState).buffer[state(BuildStringState).pos] := CHR(ORD("0") + (item.value DIV 10));
+            INC(state(BuildStringState).pos);
+            state(BuildStringState).buffer[state(BuildStringState).pos] := CHR(ORD("0") + (item.value MOD 10));
+            INC(state(BuildStringState).pos)
+        END
+    END;
+    
+    IF state(BuildStringState).pos < LEN(state(BuildStringState).buffer) - 1 THEN
+        state(BuildStringState).buffer[state(BuildStringState).pos] := ";";
+        INC(state(BuildStringState).pos)
+    END;
+    
+    state(BuildStringState).buffer[state(BuildStringState).pos] := 0X;
+    INC(state(BuildStringState).count);
+    
+    RETURN TRUE
+END BuildStringVisitor;
+
+PROCEDURE TestStatePreservation*(): BOOLEAN;
+VAR 
+    dict: Dictionary.Dictionary;
+    state: BuildStringState;
+    pass: BOOLEAN;
+    expectedSubstr1, expectedSubstr2, expectedSubstr3: ARRAY 16 OF CHAR;
+    found1, found2, found3: BOOLEAN;
+    i, j: INTEGER;
+BEGIN
+    pass := TRUE;
+    dict := Dictionary.NewStringDict();
+    
+    (* Add test data *)
+    Dictionary.PutString(dict, "a", NewTestItem(1));
+    Dictionary.PutString(dict, "b", NewTestItem(2));
+    Dictionary.PutString(dict, "c", NewTestItem(3));
+    
+    (* Initialize state *)
+    state.pos := 0;
+    state.count := 0;
+    FOR i := 0 TO LEN(state.buffer) - 1 DO
+        state.buffer[i] := 0X
+    END;
+    
+    (* Run foreach - this should build a string by appending each key:value; *)
+    Dictionary.ForeachString(dict, BuildStringVisitor, state);
+    
+    (* Verify that state was preserved across calls *)
+    Tests.ExpectedInt(3, state.count, "Should have visited 3 items", pass);
+    Tests.ExpectedBool(state.pos > 0, TRUE, "Position should have advanced", pass);
+    
+    (* Check that the buffer contains all expected substrings *)
+    expectedSubstr1 := "a:1;";
+    expectedSubstr2 := "b:2;";
+    expectedSubstr3 := "c:3;";
+    
+    (* Simple substring search *)
+    found1 := FALSE;
+    found2 := FALSE;
+    found3 := FALSE;
+    
+    i := 0;
+    WHILE (i <= state.pos - 4) & (~found1 OR ~found2 OR ~found3) DO
+        IF ~found1 THEN
+            j := 0;
+            WHILE (j < 4) & (state.buffer[i + j] = expectedSubstr1[j]) DO INC(j) END;
+            IF j = 4 THEN found1 := TRUE END
+        END;
+        
+        IF ~found2 THEN
+            j := 0;
+            WHILE (j < 4) & (state.buffer[i + j] = expectedSubstr2[j]) DO INC(j) END;
+            IF j = 4 THEN found2 := TRUE END
+        END;
+        
+        IF ~found3 THEN
+            j := 0;
+            WHILE (j < 4) & (state.buffer[i + j] = expectedSubstr3[j]) DO INC(j) END;
+            IF j = 4 THEN found3 := TRUE END
+        END;
+        
+        INC(i)
+    END;
+    
+    Tests.ExpectedBool(TRUE, found1, "Should find 'a:1;' in output", pass);
+    Tests.ExpectedBool(TRUE, found2, "Should find 'b:2;' in output", pass);
+    Tests.ExpectedBool(TRUE, found3, "Should find 'c:3;' in output", pass);
+    
+    Out.String("Built string: ["); Out.String(state.buffer); Out.String("]"); Out.Ln;
+    
+    Dictionary.Free(dict);
+    RETURN pass
+END TestStatePreservation;
+
 BEGIN
     Tests.Init(ts, "Dictionary Tests");
     Tests.Add(ts, TestNewAndFree);
@@ -285,5 +440,7 @@ BEGIN
     Tests.Add(ts, TestClear);
     Tests.Add(ts, TestStringKeys);
     Tests.Add(ts, TestStringForeach);
+    Tests.Add(ts, TestStatePreservation);
+    Tests.Add(ts, TestDumpStringDict);
     ASSERT(Tests.Run(ts))
 END DictionaryTest.

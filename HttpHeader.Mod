@@ -45,16 +45,14 @@ END Init;
 PROCEDURE WriteHeader(key: ARRAY OF CHAR; value: Collections.ItemPtr; VAR state: Collections.VisitorState): BOOLEAN;
 VAR
   val: DStrings.String;
-  ws: WriteHeaderState;
 BEGIN
-  ws := state(WriteHeaderState);
   IF value IS DStrings.String THEN
     val := value(DStrings.String);
-    DStrings.WriteString(ws.rider, key);
-    DStrings.WriteString(ws.rider, ": ");
-    DStrings.WriteDString(ws.rider, val);
-    DStrings.WriteChar(ws.rider, Chars.CR);
-    DStrings.WriteChar(ws.rider, Chars.LF)
+    DStrings.WriteString(state(WriteHeaderState).rider, key);
+    DStrings.WriteString(state(WriteHeaderState).rider, ": ");
+    DStrings.WriteDString(state(WriteHeaderState).rider, val);
+    DStrings.WriteChar(state(WriteHeaderState).rider, Chars.CR);
+    DStrings.WriteChar(state(WriteHeaderState).rider, Chars.LF)
   END;
   RETURN TRUE
 END WriteHeader;
