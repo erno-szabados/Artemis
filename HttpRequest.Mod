@@ -7,7 +7,7 @@ Released under The 3-Clause BSD License.
 
 MODULE HttpRequest;
 
-IMPORT DStrings, HttpHeader;
+IMPORT DStrings, HttpHeader, Chars;
 
 TYPE
   HttpRequest* = POINTER TO HttpRequestDesc;
@@ -65,14 +65,17 @@ BEGIN
   DStrings.WriteDString(rider, req.method);
   DStrings.WriteChar(rider, " ");
   DStrings.WriteDString(rider, req.url);
-  DStrings.WriteString(rider, " HTTP/1.1\r\n");
+  DStrings.WriteString(rider, " HTTP/1.1");
+  DStrings.WriteChar(rider, Chars.CR);
+  DStrings.WriteChar(rider, Chars.LF);
 
   (* Write headers *)
   DStrings.Init("", headerStr);
   IF HttpHeader.ToString(req.headers, headerStr) THEN
     DStrings.WriteDString(rider, headerStr)
   END;
-  DStrings.WriteString(rider, "\r\n");
+  DStrings.WriteChar(rider, Chars.CR);
+  DStrings.WriteChar(rider, Chars.LF);
 
   (* Write body if present *)
   IF DStrings.Length(req.body) > 0 THEN

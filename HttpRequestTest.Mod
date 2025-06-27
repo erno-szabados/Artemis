@@ -5,7 +5,7 @@ Copyright (C) 2025
 Released under The 3-Clause BSD License.
 *)
 MODULE HttpRequestTest;
-IMPORT HttpRequest, DStrings, Tests;
+IMPORT HttpRequest, DStrings, Tests, Out;
 
 VAR
   ts: Tests.TestSet;
@@ -95,6 +95,7 @@ BEGIN
   ok := HttpRequest.SetBody(req, "");
   Tests.ExpectedBool(TRUE, HttpRequest.ToString(req, out), "ToString returns TRUE", pass);
   DStrings.ToChars(out, buf, res);
+  Out.String(buf); Out.Ln;
   (* Could add more detailed checks here *)
   RETURN pass
 END TestToString;
