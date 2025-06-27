@@ -100,25 +100,40 @@ BEGIN
   RETURN result
 END Get;
 
+(*
+  Internal: Sets or updates a header field using DStrings.String parameters (case-insensitive). Returns TRUE on success.
+*)
+PROCEDURE SetDString(h: Header; key, value: DStrings.String): BOOLEAN;
+VAR
+  result: BOOLEAN;
+  normKey: DStrings.String;
+  keyBuf: ARRAY MaxKeyLength OF CHAR;
+  res: INTEGER;
+  valueCopy: DStrings.String;
+BEGIN
+  result := FALSE;
+  IF h # NIL THEN
+    DStrings.Copy(key, normKey);
+    DStrings.Cap(normKey); (* Normalize to uppercase for case-insensitive storage *)
+    DStrings.ToChars(normKey, keyBuf, res);
+    DStrings.Copy(value, valueCopy); (* Always store a new copy to avoid shared buffer issues *)
+    Dictionary.PutString(h.fields, keyBuf, valueCopy);
+    result := TRUE
+  END;
+  RETURN result
+END SetDString;
+
 (**
   Sets or updates a header field (case-insensitive). Returns TRUE on success.
 *)
 PROCEDURE Set*(h: Header; key, value: ARRAY OF CHAR): BOOLEAN;
 VAR
+  keyStr, valStr: DStrings.String;
   result: BOOLEAN;
-  normKey, val: DStrings.String;
-  keyBuf: ARRAY MaxKeyLength OF CHAR;
-  res: INTEGER;
 BEGIN
-  result := FALSE;
-  IF h # NIL THEN
-    DStrings.Init(key, normKey);
-    DStrings.Cap(normKey); (* Normalize to uppercase for case-insensitive storage *)
-    DStrings.ToChars(normKey, keyBuf, res);
-    DStrings.Init(value, val);
-    Dictionary.PutString(h.fields, keyBuf, val);
-    result := TRUE
-  END;
+  DStrings.Init(key, keyStr);
+  DStrings.Init(value, valStr);
+  result := SetDString(h, keyStr, valStr);
   RETURN result
 END Set;
 
@@ -198,7 +213,7 @@ VAR
   line, key, value: DStrings.String;
   lineLen: INTEGER;
   valid, success: BOOLEAN;
-  keyBuf, valueBuf: ARRAY 512 OF CHAR;
+  keyBuf, valueBuf: DStrings.String;
 BEGIN
   result := FALSE;
   IF h # NIL THEN
@@ -211,9 +226,9 @@ BEGIN
       IF lineLen > 0 THEN
         SplitHeaderLineString(line, key, value, valid);
         IF valid THEN
-          DStrings.ToChars(key, keyBuf, lineLen);
-          DStrings.ToChars(value, valueBuf, lineLen);
-          success := Set(h, keyBuf, valueBuf)
+          DStrings.Copy(key, keyBuf);
+          DStrings.Copy(value, valueBuf);
+          success := SetDString(h, keyBuf, valueBuf)
         END
       END
     END;

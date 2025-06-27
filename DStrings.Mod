@@ -524,7 +524,7 @@ BEGIN
     c := Get(r); INC(l);
   END;
   IF l > 0 THEN
-    Delete(source, 0, (l - 1));
+    Delete(source, 0, l);
   END;
 END TrimLeft;
 
@@ -936,7 +936,7 @@ BEGIN
 END WriteSet;
 
 (**WriteFixed writes a renumber with a fixed number of decimal places
-   to a string. E.g. write out dollar ammounts as 1.32 rather then E
+   to a string. E.g. write out dollar amounts as 1.32 rather then E
    notation *)
 PROCEDURE WriteFixed*(VAR r : Rider; value : REAL; n : INTEGER);
   VAR tmp : ARRAY 64 OF CHAR; ok : BOOLEAN;

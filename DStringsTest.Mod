@@ -519,6 +519,17 @@ BEGIN test := TRUE;
   RETURN test
 END TestWriteProcs;
 
+PROCEDURE TestTrimSpace() : BOOLEAN;
+VAR test: BOOLEAN; s, expected: DStrings.String;
+BEGIN
+  test := TRUE;
+  DStrings.Init("   hello world   ", s);
+  DStrings.Init("hello world", expected);
+  DStrings.TrimSpace(s);
+  ExpectedDString(expected, s, "TrimSpace('   hello world   ')", test);
+  RETURN test
+END TestTrimSpace;
+
 BEGIN
   T.Init(ts, "Test DStrings");
   T.Add(ts,TestInit);
@@ -535,6 +546,7 @@ BEGIN
   T.Add(ts,TestReplace);
   T.Add(ts,TestCap);
   T.Add(ts,TestStartsWith);
+  T.Add(ts,TestTrimSpace);
 
   (* Test the Files base procedures *)
   T.Add(ts,TestReadProcs);
