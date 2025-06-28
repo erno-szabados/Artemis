@@ -7,7 +7,7 @@ Released under The 3-Clause BSD License.
 
 MODULE DictionaryTest;
 
-IMPORT Dictionary, Collections, Tests, Out;
+IMPORT Dictionary, Collections, Tests;
 
 TYPE
     TestItem = RECORD(Collections.Item)
@@ -281,11 +281,11 @@ BEGIN
 END TestStringForeach;
 
 (* Dumps all keys and values from a string-keyed dictionary *)
-PROCEDURE DumpVisitor(key: ARRAY OF CHAR; value: Collections.ItemPtr; VAR state: Collections.VisitorState): BOOLEAN;
+(* PROCEDURE DumpVisitor(key: ARRAY OF CHAR; value: Collections.ItemPtr; VAR state: Collections.VisitorState): BOOLEAN;
 VAR item: TestItemPtr;
 BEGIN
     item := value(TestItemPtr);
-    Out.String("Key: "); Out.String(key); Out.String(", Value: "); Out.Int(item.value, 0); Out.Ln;
+    (* Out.String("Key: "); Out.String(key); Out.String(", Value: "); Out.Int(item.value, 0); Out.Ln; *)
     RETURN TRUE
 END DumpVisitor;
 
@@ -300,11 +300,11 @@ BEGIN
     Dictionary.PutString(dict, "alpha", NewTestItem(1));
     Dictionary.PutString(dict, "beta", NewTestItem(2));
     Dictionary.PutString(dict, "gamma", NewTestItem(3));
-    Out.String("Dumping all keys and values in string dictionary:"); Out.Ln;
+    (* Out.String("Dumping all keys and values in string dictionary:"); Out.Ln; *)
     Dictionary.ForeachString(dict, DumpVisitor, state);
     Dictionary.Free(dict);
     RETURN pass
-END TestDumpStringDict;
+END TestDumpStringDict; *)
 
 (* Test visitor that builds a string by appending each key-value pair *)
 PROCEDURE BuildStringVisitor(key: ARRAY OF CHAR; value: Collections.ItemPtr; VAR state: Collections.VisitorState): BOOLEAN;
@@ -423,8 +423,8 @@ BEGIN
     Tests.ExpectedBool(TRUE, found2, "Should find 'b:2;' in output", pass);
     Tests.ExpectedBool(TRUE, found3, "Should find 'c:3;' in output", pass);
     
-    Out.String("Built string: ["); Out.String(state.buffer); Out.String("]"); Out.Ln;
-    
+    (* Out.String("Built string: ["); Out.String(state.buffer); Out.String("]"); Out.Ln;
+     *)
     Dictionary.Free(dict);
     RETURN pass
 END TestStatePreservation;
@@ -441,6 +441,6 @@ BEGIN
     Tests.Add(ts, TestStringKeys);
     Tests.Add(ts, TestStringForeach);
     Tests.Add(ts, TestStatePreservation);
-    Tests.Add(ts, TestDumpStringDict);
+    (* Tests.Add(ts, TestDumpStringDict); *)
     ASSERT(Tests.Run(ts))
 END DictionaryTest.

@@ -208,7 +208,7 @@ END SplitHeaderLineString;
   Parses a DStrings.String HTTP header text into the header structure. Returns TRUE on success.
   Handles line splitting, key/value separation, whitespace trimming, and case normalization.
 *)
-PROCEDURE ParseD*(input: DStrings.String; VAR h: Header): BOOLEAN;
+PROCEDURE ParseDString*(input: DStrings.String; VAR h: Header): BOOLEAN;
 VAR
   result: BOOLEAN;
   reader: DStrings.Rider;
@@ -240,7 +240,7 @@ BEGIN
     END
   END;
   RETURN result
-END ParseD;
+END ParseDString;
 
 (**
   Parses raw HTTP header text into the header structure. Returns TRUE on success.
@@ -252,7 +252,7 @@ VAR
   result: BOOLEAN;
 BEGIN
   DStrings.Init(raw, input);
-  result := ParseD(input, h);
+  result := ParseDString(input, h);
   RETURN result
 END Parse;
 

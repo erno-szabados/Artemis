@@ -143,7 +143,7 @@ BEGIN
       END
     END;
     (* Parse headers *)
-    headerParseOk := HttpHeader.ParseD(headerBlock, resp.headers);
+    headerParseOk := HttpHeader.ParseDString(headerBlock, resp.headers);
     IF headerParseOk THEN
       resp.error := Ok;
       ok := TRUE

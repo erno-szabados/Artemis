@@ -11,8 +11,10 @@ VAR tokenizer: HttpUrlTokenizer.Tokenizer;
     token: HttpUrlTokenizer.Token;
     value: ARRAY 64 OF CHAR;
     res, i: INTEGER;
+    s : DStrings.String;
 BEGIN
-    HttpUrlTokenizer.Init(tokenizer, input);
+    DStrings.Init(input, s);
+    HttpUrlTokenizer.Init(tokenizer, s);
     i := 0;
     WHILE i < LEN(expectedTypes) DO
         HttpUrlTokenizer.NextToken(tokenizer, token);
@@ -85,10 +87,12 @@ PROCEDURE TestUtilityFunctions*(): BOOLEAN;
 VAR
     pass: BOOLEAN;
     tokenizer: HttpUrlTokenizer.Tokenizer;
+    s : DStrings.String;
 BEGIN
     pass := TRUE;
     
-    HttpUrlTokenizer.Init(tokenizer, "http://example.com");
+    DStrings.Init("http://example.com", s);
+    HttpUrlTokenizer.Init(tokenizer, s);
     
     Tests.ExpectedBool(FALSE, HttpUrlTokenizer.AtEof(tokenizer), "Not at EOF initially", pass);
     Tests.ExpectedInt(0, HttpUrlTokenizer.GetPos(tokenizer), "Initial position", pass);

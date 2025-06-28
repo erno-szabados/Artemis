@@ -15,7 +15,7 @@
   *)
 MODULE HttpUrl;
 
-IMPORT DStrings, HttpUrlTokenizer;
+IMPORT DStrings, HttpUrlTokenizer, extConvert;
 
 TYPE
  (* URL descriptor, with scheme, host, port, path, query and frag. *)
@@ -44,25 +44,22 @@ BEGIN
   Out.Ln();
 END DumpToken; *)
 
-(* Internal: Convert DStrings.String to integer *)
+(* Internal: Convert DStrings.String to integer using extConvert. *)
 PROCEDURE StringToInt(s: DStrings.String): INTEGER;
-VAR result, i, res: INTEGER; ch: CHAR; chars: ARRAY 32 OF CHAR;
+VAR i, res, result: INTEGER; chars: ARRAY 32 OF CHAR; done: BOOLEAN;
 BEGIN
-    result := 0;
-    DStrings.ToChars(s, chars, res);
-    i := 0;
-    WHILE (i < LEN(chars)) & (chars[i] # 0X) DO
-        ch := chars[i];
-        IF (ch >= "0") & (ch <= "9") THEN
-            result := result * 10 + (ORD(ch) - ORD("0"))
-        END;
-        INC(i)
-    END;
-    RETURN result
+  DStrings.ToChars(s, chars, res);
+  extConvert.StringToInt(chars, i, done);
+  IF done THEN
+    result := i
+  ELSE
+    result := 0
+  END;
+  RETURN result
 END StringToInt;
 
-(** Parses the string to an URL descriptor. Returns TRUE on success. *)
-PROCEDURE Parse*(raw: ARRAY OF CHAR; VAR u: Url): BOOLEAN;
+(* Parses a DStrings.String to a Url descriptor. Returns TRUE on success. *)
+PROCEDURE ParseDString*(input: DStrings.String; VAR u: Url): BOOLEAN;
 VAR
     result: BOOLEAN;
     tokenizer: HttpUrlTokenizer.Tokenizer;
@@ -74,8 +71,6 @@ VAR
     lastKey: DStrings.String;
 BEGIN
     result := FALSE;
-    
-    (* Initialize new URL structure *)
     NEW(newUrl);
     DStrings.Init("", newUrl.scheme);
     DStrings.Init("", newUrl.host);
@@ -83,84 +78,58 @@ BEGIN
     DStrings.Init("", newUrl.path);
     DStrings.Init("", newUrl.query);
     DStrings.Init("", newUrl.frag);
-    
-    (* Initialize tokenizer *)
-    HttpUrlTokenizer.Init(tokenizer, raw);
-    
-    (* Parse tokens in order: [scheme:][//]host[:port][/path][?query][#fragment] *)
+    HttpUrlTokenizer.Init(tokenizer, input);
     expectingValue := FALSE;
     DStrings.Init("", lastKey);
-    
     WHILE ~HttpUrlTokenizer.AtEof(tokenizer) DO
         HttpUrlTokenizer.NextToken(tokenizer, token);
-
-        (* Helper for debugging *)
-        (* DumpToken(token); *)
-        
         IF token.type = HttpUrlTokenizer.ErrorToken THEN
-            (* Parsing error occurred *)
             result := FALSE
         ELSIF token.type = HttpUrlTokenizer.EofToken THEN
-            (* End of input *)
             result := TRUE
         ELSIF token.type = HttpUrlTokenizer.SchemeToken THEN
-            (* Copy scheme *)
             DStrings.Copy(token.value, newUrl.scheme);
             result := TRUE
         ELSIF token.type = HttpUrlTokenizer.SlashSlashToken THEN
-            (* Skip "//" - it"s just a separator *)
             result := TRUE
         ELSIF token.type = HttpUrlTokenizer.HostToken THEN
-            (* Copy host *)
             DStrings.Copy(token.value, newUrl.host);
             result := TRUE
         ELSIF token.type = HttpUrlTokenizer.PortToken THEN
-            (* Convert port string to integer *)
             newUrl.port := StringToInt(token.value);
             result := TRUE
         ELSIF token.type = HttpUrlTokenizer.PathToken THEN
-            (* Store path *)
             DStrings.Copy(token.value, newUrl.path);
             result := TRUE
         ELSIF token.type = HttpUrlTokenizer.QueryStartToken THEN
-            (* Initialize query string building *)
             DStrings.Init("", queryParts);
             result := TRUE
         ELSIF token.type = HttpUrlTokenizer.QueryKeyToken THEN
-            (* Store key for query parameter *)
             DStrings.Append(token.value, queryParts);
             DStrings.Copy(token.value, lastKey);
             expectingValue := TRUE;
             result := TRUE
         ELSIF token.type = HttpUrlTokenizer.QueryEqualsToken THEN
-            (* Add equals sign to query string *)
             DStrings.CopyChars("=", pathParts);
             DStrings.Append(pathParts, queryParts);
             result := TRUE
         ELSIF token.type = HttpUrlTokenizer.QueryValueToken THEN
-            (* Add query value to query string *)
             DStrings.Append(token.value, queryParts);
             expectingValue := FALSE;
             result := TRUE
         ELSIF token.type = HttpUrlTokenizer.QuerySeparatorToken THEN
-            (* Add separator to query string *)
             DStrings.CopyChars("&", pathParts);
             DStrings.Append(pathParts, queryParts);
             result := TRUE
         ELSIF token.type = HttpUrlTokenizer.FragmentStartToken THEN
-            (* Skip "#" - it"s just a separator *)
             result := TRUE
         ELSIF token.type = HttpUrlTokenizer.FragmentToken THEN
-            (* Store fragment *)
             DStrings.Copy(token.value, newUrl.frag);
             result := TRUE
         ELSE
-            (* Unknown token type *)
             result := FALSE
         END
     END;
-    
-    (* If we had a pending key without value, add it *)
     IF expectingValue & (DStrings.Length(lastKey) > 0) THEN
         IF DStrings.Length(queryParts) > 0 THEN
             DStrings.CopyChars("&", pathParts);
@@ -169,23 +138,29 @@ BEGIN
         DStrings.Copy(lastKey, pathParts);
         DStrings.Append(pathParts, queryParts)
     END;
-    
-    (* Assign final query string *)
     IF DStrings.Length(queryParts) > 0 THEN
         DStrings.Copy(queryParts, newUrl.query)
     END;
-    
-    (* Only assign result if parsing was successful *)
     IF result THEN
         u := newUrl
     END;
-    
+    RETURN result
+END ParseDString;
+
+(** Parses the raw string to an URL descriptor. Returns TRUE on success. *)
+PROCEDURE Parse*(raw: ARRAY OF CHAR; VAR u: Url): BOOLEAN;
+VAR
+    input: DStrings.String;
+    result: BOOLEAN;
+BEGIN
+    DStrings.Init(raw, input);
+    result := ParseDString(input, u);
     RETURN result
 END Parse;
 
 
-(** Reserialize the URL. On success: u # NIL, u -> fields populated, returns TRUE *)
-PROCEDURE ToString*(u: Url; VAR out: DStrings.String) : BOOLEAN;
+(** Reserialize the URL. On success: out contains serialized URL, returns TRUE *)
+PROCEDURE ToDString*(u: Url; VAR out: DStrings.String) : BOOLEAN;
 VAR
   result: BOOLEAN;
   rider: DStrings.Rider;
@@ -225,7 +200,7 @@ BEGIN
   END;
 
   RETURN result
-END ToString;
+END ToDString;
 
 (* Internal: Extract next key-value pair from query string. Returns TRUE if a pair was found, FALSE if at end. Advances rider. *)
 PROCEDURE NextQueryParam(VAR rider: DStrings.Rider; VAR key, value: DStrings.String): BOOLEAN;

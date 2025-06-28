@@ -87,7 +87,7 @@ BEGIN
   ok := HttpUrl.Parse(raw, url);
   Tests.ExpectedBool(TRUE, ok, "Parse for ToString", pass);
   IF ok THEN
-    ok := HttpUrl.ToString(url, out);
+    ok := HttpUrl.ToDString(url, out);
     Tests.ExpectedBool(TRUE, ok, "ToString returns ok", pass);
     DStrings.ToChars(out, buf, res);
     Tests.ExpectedString(raw, buf, "Round-trip ToString", pass);
@@ -142,7 +142,7 @@ BEGIN
   IF ok THEN
     ok := HttpUrl.SetParam(url, "foo", "bar");
     Tests.ExpectedBool(TRUE, ok, "SetParam new param", pass);
-    ok := HttpUrl.ToString(url, out);
+    ok := HttpUrl.ToDString(url, out);
     Tests.ExpectedBool(TRUE, ok, "ToString after SetParam", pass);
     DStrings.ToChars(out, buf, res);
     Tests.ExpectedString("http://example.com/path?foo=bar", buf, "URL with new param", pass);

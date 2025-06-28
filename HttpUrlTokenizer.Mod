@@ -62,11 +62,11 @@ TYPE
     IsValidProc = PROCEDURE(ch: CHAR): BOOLEAN;
 
 (** Initialize tokenizer with raw URL string *)
-PROCEDURE Init*(VAR tokenizer: Tokenizer; raw: ARRAY OF CHAR);
+PROCEDURE Init*(VAR tokenizer: Tokenizer; url: DStrings.String);
 VAR result: Tokenizer;
 BEGIN
     NEW(result);
-    DStrings.Init(raw, result.str);
+    DStrings.Copy(url, result.str);
     DStrings.Set(result.rider, result.str, 0);
     result.error := NoError;
     result.state := StateScheme;

@@ -44,11 +44,11 @@ BEGIN
 END SetBody;
 
 (** Sets the request body from a DStrings.String. *)
-PROCEDURE SetBodyD*(req: HttpRequest; body: DStrings.String): BOOLEAN;
+PROCEDURE SetBodyDString*(req: HttpRequest; body: DStrings.String): BOOLEAN;
 BEGIN
   DStrings.Copy(body, req.body);
   RETURN TRUE
-END SetBodyD;
+END SetBodyDString;
 
 (** Serializes the request into a DStrings.String for sending. *)
 PROCEDURE ToString*(req: HttpRequest; VAR out: DStrings.String): BOOLEAN;

@@ -5,7 +5,7 @@ Copyright (C) 2025
 Released under The 3-Clause BSD License.
 *)
 MODULE HttpRequestTest;
-IMPORT HttpRequest, DStrings, Tests, Out, Chars;
+IMPORT HttpRequest, DStrings, Tests, Chars;
 
 VAR
   ts: Tests.TestSet;
@@ -116,7 +116,7 @@ BEGIN
   ok := HttpRequest.SetHeader(req, "accept", "text/html");
   ok := HttpRequest.SetHeader(req, "user-agent", "artemis/0.1");
   ok := HttpRequest.SetHeader(req, "content-length", bodyLenStr);
-  Tests.ExpectedBool(TRUE, HttpRequest.SetBodyD(req, body), "SetBodyD returns TRUE for multiline", pass);
+  Tests.ExpectedBool(TRUE, HttpRequest.SetBodyDString(req, body), "SetBodyD returns TRUE for multiline", pass);
   DStrings.Init("", dstr);
   HttpRequest.GetBody(req, dstr);
   DStrings.ToChars(dstr, buf, res);
@@ -124,9 +124,9 @@ BEGIN
   Tests.ExpectedString(buf, buf, "Multiline body set correctly", pass);
   ok := HttpRequest.ToString(req, dstr);
   DStrings.ToChars(dstr, buf, res);
-  Out.String("--- Multiline POST request ---"); Out.Ln;
+  (* Out.String("--- Multiline POST request ---"); Out.Ln;
   Out.String(buf); Out.Ln;
-  Out.String("----------------------"); Out.Ln;
+  Out.String("----------------------"); Out.Ln; *)
   RETURN pass
 END TestSetMultilineBody;
 
@@ -144,7 +144,7 @@ BEGIN
   ok := HttpRequest.SetBody(req, "");
   Tests.ExpectedBool(TRUE, HttpRequest.ToString(req, out), "ToString returns TRUE", pass);
   DStrings.ToChars(out, buf, res);
-  Out.String(buf); Out.Ln;
+  (* Out.String(buf); Out.Ln; *)
   (* Could add more detailed checks here *)
   RETURN pass
 END TestToString;
