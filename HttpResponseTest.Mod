@@ -5,7 +5,7 @@ Copyright (C) 2025
 Released under The 3-Clause BSD License.
 *)
 MODULE HttpResponseTest;
-IMPORT HttpResponse, DStrings, Tests, Chars;
+IMPORT HttpResponse, DStrings, Tests, Chars, Out;
 
 VAR
   ts: Tests.TestSet;
@@ -28,9 +28,10 @@ VAR
   pass, ok: BOOLEAN;
   resp: HttpResponse.HttpResponse;
   raw: ARRAY 128 OF CHAR;
-  dstr: DStrings.String;
+  dstr, body: DStrings.String;
   rider: DStrings.Rider;
   res: INTEGER;
+  buf: ARRAY 128 OF CHAR;
 BEGIN
   pass := TRUE;
   NEW(resp);
@@ -46,6 +47,10 @@ BEGIN
   DStrings.ToChars(dstr, raw, res);
   ok := HttpResponse.Parse(raw, resp);
   Tests.ExpectedBool(TRUE, ok, "Parse stub returns TRUE", pass);
+  DStrings.Init("", body);
+  HttpResponse.GetBody(resp, body);
+  DStrings.ToChars(body, buf, res);
+  Tests.ExpectedString("Hello", buf, "Body is 'Hello'", pass);
   RETURN pass
 END TestParseStub;
 
@@ -86,9 +91,10 @@ VAR
   pass, ok, found: BOOLEAN;
   resp: HttpResponse.HttpResponse;
   raw: ARRAY 128 OF CHAR;
-  dstr, value: DStrings.String;
+  dstr, value, body: DStrings.String;
   rider: DStrings.Rider;
   res: INTEGER;
+  buf: ARRAY 128 OF CHAR;
 BEGIN
   pass := TRUE;
   NEW(resp);
@@ -102,8 +108,9 @@ BEGIN
   DStrings.WriteString(rider, "X-Test: Artemis");
   DStrings.WriteChar(rider, Chars.CR); DStrings.WriteChar(rider, Chars.LF);
   DStrings.WriteChar(rider, Chars.CR); DStrings.WriteChar(rider, Chars.LF);
-  DStrings.WriteString(rider, "Hello");
+  DStrings.WriteString(rider, "Hello, world!");
   DStrings.ToChars(dstr, raw, res);
+  Out.String("[TEST DEBUG] raw: "); Out.String(raw); Out.String(" len: "); Out.Int(res, 0); Out.Ln();
   ok := HttpResponse.Parse(raw, resp);
   Tests.ExpectedBool(TRUE, ok, "Parse returns TRUE for valid response with headers", pass);
   DStrings.Init("", value);
@@ -117,6 +124,10 @@ BEGIN
   Tests.ExpectedString("Artemis", raw, "X-Test value is 'Artemis'", pass);
   found := HttpResponse.GetHeader(resp, "Missing", value);
   Tests.ExpectedBool(FALSE, found, "Missing header not found", pass);
+  DStrings.Init("", body);
+  HttpResponse.GetBody(resp, body);
+  DStrings.ToChars(body, buf, res);
+  Tests.ExpectedString("Hello, world!", buf, "Body is 'Hello, world!'", pass);
   RETURN pass
 END TestParseHeader;
 
