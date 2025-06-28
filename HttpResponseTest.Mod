@@ -16,8 +16,8 @@ VAR
   resp: HttpResponse.HttpResponse;
 BEGIN
   pass := TRUE;
-  (* Just allocate and check default fields *)
   NEW(resp);
+  HttpResponse.Init(resp);
   Tests.ExpectedInt(0, HttpResponse.GetStatus(resp), "Default status code is 0", pass);
   Tests.ExpectedBool(FALSE, HttpResponse.IsOk(resp), "Default IsOk is FALSE", pass);
   RETURN pass
@@ -28,11 +28,24 @@ VAR
   pass, ok: BOOLEAN;
   resp: HttpResponse.HttpResponse;
   raw: ARRAY 128 OF CHAR;
+  dstr: DStrings.String;
+  rider: DStrings.Rider;
+  res: INTEGER;
 BEGIN
   pass := TRUE;
-  raw := "HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\n\r\nHello";
+  NEW(resp);
+  HttpResponse.Init(resp);
+  DStrings.Init("", dstr);
+  DStrings.Set(rider, dstr, 0);
+  DStrings.WriteString(rider, "HTTP/1.1 200 OK");
+  DStrings.WriteChar(rider, Chars.CR); DStrings.WriteChar(rider, Chars.LF);
+  DStrings.WriteString(rider, "Content-Type: text/plain");
+  DStrings.WriteChar(rider, Chars.CR); DStrings.WriteChar(rider, Chars.LF);
+  DStrings.WriteChar(rider, Chars.CR); DStrings.WriteChar(rider, Chars.LF);
+  DStrings.WriteString(rider, "Hello");
+  DStrings.ToChars(dstr, raw, res);
   ok := HttpResponse.Parse(raw, resp);
-  Tests.ExpectedBool(FALSE, ok, "Parse stub returns FALSE", pass);
+  Tests.ExpectedBool(TRUE, ok, "Parse stub returns TRUE", pass);
   RETURN pass
 END TestParseStub;
 
@@ -47,6 +60,8 @@ VAR
   rider: DStrings.Rider;
 BEGIN
   pass := TRUE;
+  NEW(resp);
+  HttpResponse.Init(resp);
   DStrings.Init("", dstr);
   DStrings.Set(rider, dstr, 0);
   DStrings.WriteString(rider, "HTTP/1.1 404 Not Found");
@@ -66,10 +81,50 @@ BEGIN
   RETURN pass
 END TestParseStatusLine;
 
+PROCEDURE TestParseHeader*(): BOOLEAN;
+VAR
+  pass, ok, found: BOOLEAN;
+  resp: HttpResponse.HttpResponse;
+  raw: ARRAY 128 OF CHAR;
+  dstr, value: DStrings.String;
+  rider: DStrings.Rider;
+  res: INTEGER;
+BEGIN
+  pass := TRUE;
+  NEW(resp);
+  HttpResponse.Init(resp);
+  DStrings.Init("", dstr);
+  DStrings.Set(rider, dstr, 0);
+  DStrings.WriteString(rider, "HTTP/1.1 200 OK");
+  DStrings.WriteChar(rider, Chars.CR); DStrings.WriteChar(rider, Chars.LF);
+  DStrings.WriteString(rider, "Content-Type: text/plain");
+  DStrings.WriteChar(rider, Chars.CR); DStrings.WriteChar(rider, Chars.LF);
+  DStrings.WriteString(rider, "X-Test: Artemis");
+  DStrings.WriteChar(rider, Chars.CR); DStrings.WriteChar(rider, Chars.LF);
+  DStrings.WriteChar(rider, Chars.CR); DStrings.WriteChar(rider, Chars.LF);
+  DStrings.WriteString(rider, "Hello");
+  DStrings.ToChars(dstr, raw, res);
+  ok := HttpResponse.Parse(raw, resp);
+  Tests.ExpectedBool(TRUE, ok, "Parse returns TRUE for valid response with headers", pass);
+  DStrings.Init("", value);
+  found := HttpResponse.GetHeader(resp, "Content-Type", value);
+  Tests.ExpectedBool(TRUE, found, "Content-Type header found", pass);
+  DStrings.ToChars(value, raw, res);
+  Tests.ExpectedString("text/plain", raw, "Content-Type value is 'text/plain'", pass);
+  found := HttpResponse.GetHeader(resp, "X-Test", value);
+  Tests.ExpectedBool(TRUE, found, "X-Test header found", pass);
+  DStrings.ToChars(value, raw, res);
+  Tests.ExpectedString("Artemis", raw, "X-Test value is 'Artemis'", pass);
+  found := HttpResponse.GetHeader(resp, "Missing", value);
+  Tests.ExpectedBool(FALSE, found, "Missing header not found", pass);
+  RETURN pass
+END TestParseHeader;
+
 BEGIN
   Tests.Init(ts, "HttpResponse Tests");
   Tests.Add(ts, TestInit);
   Tests.Add(ts, TestParseStub);
   Tests.Add(ts, TestParseStatusLine);
+  Tests.Add(ts, TestParseHeader);
   ASSERT(Tests.Run(ts));
 END HttpResponseTest.

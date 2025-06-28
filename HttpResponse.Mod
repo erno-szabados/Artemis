@@ -7,7 +7,7 @@ Released under The 3-Clause BSD License.
 
 MODULE HttpResponse;
 
-IMPORT DStrings, HttpHeader, Chars, extConvert;
+IMPORT DStrings, HttpHeader, Chars, extConvert, Out;
 
 CONST
   Ok* = 0;
@@ -102,59 +102,75 @@ BEGIN
   result := lineOk & splitOk & codeOk
 END ReadStatusLine;
 
+(* Internal: Reads header lines from the reader into headerBlock until an empty line. *)
+PROCEDURE ReadHeaderBlock(VAR reader: DStrings.Rider; VAR headerBlock: DStrings.String);
+VAR
+  headerLine: DStrings.String;
+  headerLinesOk, inHeaders: BOOLEAN;
+  headerBlockRider: DStrings.Rider;
+BEGIN
+  DStrings.Init("", headerBlock);
+  DStrings.Set(headerBlockRider, headerBlock, 0);
+  inHeaders := TRUE;
+  WHILE inHeaders DO
+    DStrings.Init("", headerLine);
+    ReadLine(reader, headerLine, headerLinesOk);
+    IF ~headerLinesOk THEN
+      inHeaders := FALSE
+    ELSIF DStrings.Length(headerLine) = 0 THEN
+      inHeaders := FALSE
+    ELSE
+      DStrings.WriteDString(headerBlockRider, headerLine);
+      DStrings.WriteChar(headerBlockRider, Chars.CR);
+      DStrings.WriteChar(headerBlockRider, Chars.LF)
+    END
+  END
+END ReadHeaderBlock;
+
 (** Parses a raw HTTP response (ARRAY OF CHAR) into a HttpResponse. Returns TRUE on success. *)
 PROCEDURE Parse*(raw: ARRAY OF CHAR; VAR resp: HttpResponse): BOOLEAN;
 VAR
-  ok, statusOk: BOOLEAN;
+  ok, statusOk, headerParseOk: BOOLEAN;
   input, versionStr, statusStr, reasonStr, headerBlock: DStrings.String;
   reader: DStrings.Rider;
   code: INTEGER;
-  headerLine: DStrings.String;
-  headerLinesOk, headerParseOk, inHeaders: BOOLEAN;
-  headerBlockRider: DStrings.Rider;
+  buf: ARRAY 256 OF CHAR;
+  res: INTEGER;
 BEGIN
   ok := FALSE;
-  NEW(resp);
-  resp.error := ParseError; (* Default to error unless parsing succeeds *)
-  DStrings.Init(raw, input);
-  DStrings.Set(reader, input, 0);
-  DStrings.Init("", versionStr); DStrings.Init("", statusStr); DStrings.Init("", reasonStr);
-  code := 0;
-  ReadStatusLine(reader, versionStr, statusStr, reasonStr, code, statusOk);
-  IF statusOk THEN
-    DStrings.Copy(versionStr, resp.version);
-    resp.statusCode := code;
-    DStrings.Copy(reasonStr, resp.reason);
-    (* Read header lines until empty line using WHILE and DStrings.Rider *)
-    DStrings.Init("", headerBlock);
-    DStrings.Set(headerBlockRider, headerBlock, 0);
-    inHeaders := TRUE;
-    WHILE inHeaders DO
-      DStrings.Init("", headerLine);
-      ReadLine(reader, headerLine, headerLinesOk);
-      IF ~headerLinesOk THEN
-        inHeaders := FALSE
-      ELSIF DStrings.Length(headerLine) = 0 THEN
-        inHeaders := FALSE
+  IF resp # NIL THEN
+    DStrings.Init(raw, input);
+    DStrings.Set(reader, input, 0);
+    DStrings.Init("", versionStr); DStrings.Init("", statusStr); DStrings.Init("", reasonStr);
+    code := 0;
+    ReadStatusLine(reader, versionStr, statusStr, reasonStr, code, statusOk);
+    IF statusOk THEN
+      DStrings.Copy(versionStr, resp.version);
+      resp.statusCode := code;
+      DStrings.Copy(reasonStr, resp.reason);
+      ReadHeaderBlock(reader, headerBlock);
+      DStrings.ToChars(headerBlock, buf, res);
+      Out.String("[DEBUG] Header block: "); Out.String(buf); Out.Ln();
+      IF DStrings.Length(headerBlock) = 0 THEN
+        resp.headers := NIL;
+        headerParseOk := TRUE
       ELSE
-        DStrings.WriteDString(headerBlockRider, headerLine);
-        DStrings.WriteChar(headerBlockRider, Chars.CR);
-        DStrings.WriteChar(headerBlockRider, Chars.LF)
-      END
-    END;
-    (* Parse headers *)
-    headerParseOk := HttpHeader.ParseDString(headerBlock, resp.headers);
-    IF headerParseOk THEN
-      resp.error := Ok;
-      ok := TRUE
+        HttpHeader.Init(resp.headers);
+        headerParseOk := HttpHeader.ParseDString(headerBlock, resp.headers)
+      END;
+      IF headerParseOk THEN
+        resp.error := Ok;
+        ok := TRUE
+      ELSE
+        resp.error := ParseError;
+        ok := FALSE
+      END;
+      DStrings.Init("", resp.body)
     ELSE
       resp.error := ParseError;
       ok := FALSE
-    END;
-    (* Body parsing to be implemented *)
-    DStrings.Init("", resp.body)
+    END
   ELSE
-    resp.error := ParseError;
     ok := FALSE
   END;
   RETURN ok
@@ -164,38 +180,83 @@ END Parse;
 
 (** Returns the status code. *)
 PROCEDURE GetStatus*(resp: HttpResponse): INTEGER;
+VAR result: INTEGER;
 BEGIN
-  RETURN resp.statusCode
+  IF resp # NIL THEN
+    result := resp.statusCode
+  ELSE
+    result := 0
+  END;
+  RETURN result
 END GetStatus;
 
 (** Gets the reason phrase. *)
 PROCEDURE GetReason*(resp: HttpResponse; VAR reason: DStrings.String);
 BEGIN
-  DStrings.Copy(resp.reason, reason)
+  IF resp # NIL THEN
+    DStrings.Copy(resp.reason, reason)
+  ELSE
+    DStrings.Init("", reason)
+  END
 END GetReason;
 
 (** Gets the HTTP version. *)
 PROCEDURE GetVersion*(resp: HttpResponse; VAR version: DStrings.String);
 BEGIN
-  DStrings.Copy(resp.version, version)
+  IF resp # NIL THEN
+    DStrings.Copy(resp.version, version)
+  ELSE
+    DStrings.Init("", version)
+  END
 END GetVersion;
 
 (** Gets the value of a header field (case-insensitive). Returns TRUE if found. *)
 PROCEDURE GetHeader*(resp: HttpResponse; key: ARRAY OF CHAR; VAR value: DStrings.String): BOOLEAN;
+VAR result: BOOLEAN;
 BEGIN
-  RETURN HttpHeader.Get(resp.headers, key, value)
+  IF resp # NIL THEN
+    result := HttpHeader.Get(resp.headers, key, value)
+  ELSE
+    DStrings.Init("", value);
+    result := FALSE
+  END;
+  RETURN result
 END GetHeader;
 
 (** Gets the response body. *)
 PROCEDURE GetBody*(resp: HttpResponse; VAR body: DStrings.String);
 BEGIN
-  DStrings.Copy(resp.body, body)
+  IF resp # NIL THEN
+    DStrings.Copy(resp.body, body)
+  ELSE
+    DStrings.Init("", body)
+  END
 END GetBody;
 
 (** Returns TRUE if the response was parsed without error. *)
 PROCEDURE IsOk*(resp: HttpResponse): BOOLEAN;
+VAR result: BOOLEAN;
 BEGIN
-  RETURN resp.error = Ok
+  IF resp # NIL THEN
+    result := resp.error = Ok
+  ELSE
+    result := FALSE
+  END;
+  RETURN result
 END IsOk;
+
+(* Initializes a HttpResponse descriptor to safe defaults. *)
+PROCEDURE Init*(VAR resp: HttpResponse);
+BEGIN
+  IF resp = NIL THEN
+    NEW(resp)
+  END;
+  DStrings.Init("", resp.version);
+  resp.statusCode := 0;
+  DStrings.Init("", resp.reason);
+  resp.headers := NIL;
+  DStrings.Init("", resp.body);
+  resp.error := ParseError
+END Init;
 
 END HttpResponse.
