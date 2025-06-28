@@ -19,6 +19,9 @@
   - You cannot substitute a procedure into SYSTEM.VAL(), use a local variable in such cases.
   - Oberon-07 reintroduced FOR loops, so **use them instead of WHILE loops where appropriate**.
   - There is no enumeration type in oberon 07. use INTEGER. 
+  - Oberon does not support escape sequences, 
+    the correct approach is to user a combination of a rider-based DStrings write operations 
+    and Chars.CR and similar constants from `Chars.mod`.
 - **Best Practices**
   - Functions and procedures should be clear, concise, and well-structured.
   - Use helper functions to avoid code duplication.
