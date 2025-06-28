@@ -143,14 +143,14 @@ BEGIN
       END
     END;
     (* Parse headers *)
-    headerParseOk := HttpHeader.Parse(headerBlock, resp.headers);
+    headerParseOk := HttpHeader.ParseD(headerBlock, resp.headers);
     IF headerParseOk THEN
       resp.error := Ok;
       ok := TRUE
     ELSE
       resp.error := ParseError;
       ok := FALSE
-    END
+    END;
     (* Body parsing to be implemented *)
     DStrings.Init("", resp.body)
   ELSE
