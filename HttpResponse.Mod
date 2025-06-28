@@ -160,7 +160,10 @@ BEGIN
       END;
       IF headerParseOk THEN
         resp.error := Ok;
-        ok := TRUE
+        ok := TRUE;
+        (* Extract body: read the rest of the input after headers *)
+        DStrings.Init("", resp.body);
+        DStrings.ReadDString(reader, resp.body);
       ELSE
         resp.error := ParseError;
         ok := FALSE

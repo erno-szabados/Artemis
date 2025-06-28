@@ -69,10 +69,12 @@ VAR
   state: WriteHeaderState;
 BEGIN
   result := FALSE;
-  DStrings.Init("", out);
-  DStrings.Set(state.rider, out, 0);
-  Dictionary.ForeachString(h.fields, WriteHeader, state);
-  result := TRUE;
+  IF h # NIL THEN
+    DStrings.Init("", out);
+    DStrings.Set(state.rider, out, 0);
+    Dictionary.ForeachString(h.fields, WriteHeader, state);
+    result := TRUE
+  END;
   RETURN result
 END ToString;
 
@@ -134,9 +136,12 @@ VAR
   keyStr, valStr: DStrings.String;
   result: BOOLEAN;
 BEGIN
-  DStrings.Init(key, keyStr);
-  DStrings.Init(value, valStr);
-  result := SetDString(h, keyStr, valStr);
+  result := FALSE;
+  IF h # NIL THEN
+    DStrings.Init(key, keyStr);
+    DStrings.Init(value, valStr);
+    result := SetDString(h, keyStr, valStr)
+  END;
   RETURN result
 END Set;
 
@@ -251,8 +256,11 @@ VAR
   input: DStrings.String;
   result: BOOLEAN;
 BEGIN
-  DStrings.Init(raw, input);
-  result := ParseDString(input, h);
+  result := FALSE;
+  IF h # NIL THEN
+    DStrings.Init(raw, input);
+    result := ParseDString(input, h)
+  END;
   RETURN result
 END Parse;
 
@@ -261,7 +269,9 @@ END Parse;
 *)
 PROCEDURE Foreach*(h: Header; visit: Dictionary.StringKeyVisitProc; VAR state: Dictionary.DictVisitorState);
 BEGIN
-  Dictionary.ForeachString(h.fields, visit, state)
+  IF h # NIL THEN
+    Dictionary.ForeachString(h.fields, visit, state)
+  END
 END Foreach;
 
 END HttpHeader.
