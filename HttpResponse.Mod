@@ -112,6 +112,7 @@ VAR
 BEGIN
   ok := FALSE;
   NEW(resp);
+  resp.error := ParseError; (* Default to error unless parsing succeeds *)
   DStrings.Init(raw, input);
   DStrings.Set(reader, input, 0);
   DStrings.Init("", versionStr); DStrings.Init("", statusStr); DStrings.Init("", reasonStr);
