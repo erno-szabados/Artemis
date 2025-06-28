@@ -106,9 +106,12 @@ END ReadStatusLine;
 PROCEDURE Parse*(raw: ARRAY OF CHAR; VAR resp: HttpResponse): BOOLEAN;
 VAR
   ok, statusOk: BOOLEAN;
-  input, versionStr, statusStr, reasonStr: DStrings.String;
+  input, versionStr, statusStr, reasonStr, headerBlock: DStrings.String;
   reader: DStrings.Rider;
   code: INTEGER;
+  headerLine: DStrings.String;
+  headerLinesOk, headerParseOk, inHeaders: BOOLEAN;
+  headerBlockRider: DStrings.Rider;
 BEGIN
   ok := FALSE;
   NEW(resp);
@@ -122,8 +125,34 @@ BEGIN
     DStrings.Copy(versionStr, resp.version);
     resp.statusCode := code;
     DStrings.Copy(reasonStr, resp.reason);
-    resp.error := Ok;
-    ok := TRUE
+    (* Read header lines until empty line using WHILE and DStrings.Rider *)
+    DStrings.Init("", headerBlock);
+    DStrings.Set(headerBlockRider, headerBlock, 0);
+    inHeaders := TRUE;
+    WHILE inHeaders DO
+      DStrings.Init("", headerLine);
+      ReadLine(reader, headerLine, headerLinesOk);
+      IF ~headerLinesOk THEN
+        inHeaders := FALSE
+      ELSIF DStrings.Length(headerLine) = 0 THEN
+        inHeaders := FALSE
+      ELSE
+        DStrings.WriteDString(headerBlockRider, headerLine);
+        DStrings.WriteChar(headerBlockRider, Chars.CR);
+        DStrings.WriteChar(headerBlockRider, Chars.LF)
+      END
+    END;
+    (* Parse headers *)
+    headerParseOk := HttpHeader.Parse(headerBlock, resp.headers);
+    IF headerParseOk THEN
+      resp.error := Ok;
+      ok := TRUE
+    ELSE
+      resp.error := ParseError;
+      ok := FALSE
+    END
+    (* Body parsing to be implemented *)
+    DStrings.Init("", resp.body)
   ELSE
     resp.error := ParseError;
     ok := FALSE
