@@ -7,9 +7,10 @@
   - Open array parameters are allowed as procedure parameters only.
   - Function return values **must be handled**.
   - Return is only allowed as the last statement in a procedure. Use a `result` variable for returning values.
-  - No early returns are allowed. EXIT is not a valid oberon keyword.
-  - Embedded procedures are not allowed.
-  - Forward declarations for procedures are not allowed (only for pointers).
+  - Early returns are not valid in Oberon-07. EXIT is not a valid oberon keyword.
+  - Procedures within procedures are not valid in Oberon-07.
+  - Procedure definitions must precede their calls.
+  - Forward declarations for procedures are not valid in Oberon-07 (only for pointers).
   - A situation requiring mutual recursion can be handled by using procedure types to make indirect calls.
   - The last statement before an `END` or an `ELSE` **must not end with a semicolon**.
   - For bitwise operations, use our own implementation from `Bitwise.mod`.
