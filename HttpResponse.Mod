@@ -7,7 +7,7 @@ Released under The 3-Clause BSD License.
 
 MODULE HttpResponse;
 
-IMPORT DStrings, HttpHeader, Chars, extConvert, Out;
+IMPORT DStrings, HttpHeader, Chars, extConvert;
 
 CONST
   Ok* = 0;
@@ -134,8 +134,6 @@ VAR
   input, versionStr, statusStr, reasonStr, headerBlock: DStrings.String;
   reader: DStrings.Rider;
   code: INTEGER;
-  buf: ARRAY 256 OF CHAR;
-  res: INTEGER;
 BEGIN
   ok := FALSE;
   IF resp # NIL THEN
@@ -148,15 +146,7 @@ BEGIN
       DStrings.Copy(versionStr, resp.version);
       resp.statusCode := code;
       DStrings.Copy(reasonStr, resp.reason);
-      
-      DStrings.ToChars(input, buf, res);
-      Out.String("Input:["); Out.String(buf); Out.String("]"); Out.Ln();
-      
-      Out.String("Before read header:"); Out.Int(reader.pos, 0); Out.Ln();
       ReadHeaderBlock(reader, headerBlock);
-      DStrings.ToChars(headerBlock, buf, res);
-      Out.String("[DEBUG] Header block: "); Out.String(buf); Out.Ln();
-      Out.String("After read header:"); Out.Int(reader.pos, 0); Out.Ln();
       IF DStrings.Length(headerBlock) = 0 THEN
         resp.headers := NIL;
         headerParseOk := TRUE
@@ -169,18 +159,11 @@ BEGIN
         ok := TRUE;
         (* Extract body: read the rest of the input after headers *)
         DStrings.Init("", resp.body);
-        Chars.Clear(buf);
-        
-        Out.String("Before body read:");Out.Int(reader.pos, 0); Out.Ln();
-        DStrings.ReadString(reader, buf);
-        (* DStrings.ReadDString(reader, resp.body); *)
-        Out.String("BODY:"); Out.String(buf); Out.Ln();
-        Out.String("After body read:");Out.Int(reader.pos, 0); Out.Ln()
+        DStrings.ReadDString(reader, resp.body); 
         ELSE
         resp.error := ParseError;
         ok := FALSE
       END;
-      DStrings.Init("", resp.body)
     ELSE
       resp.error := ParseError;
       ok := FALSE

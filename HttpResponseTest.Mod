@@ -5,7 +5,7 @@ Copyright (C) 2025
 Released under The 3-Clause BSD License.
 *)
 MODULE HttpResponseTest;
-IMPORT HttpResponse, DStrings, Tests, Chars, Out;
+IMPORT HttpResponse, DStrings, Tests, Chars;
 
 VAR
   ts: Tests.TestSet;
@@ -110,7 +110,7 @@ BEGIN
   DStrings.WriteChar(rider, Chars.CR); DStrings.WriteChar(rider, Chars.LF);
   DStrings.WriteString(rider, "Hello, world!");
   DStrings.ToChars(dstr, raw, res);
-  Out.String("[TEST DEBUG] raw: "); Out.String(raw); Out.String(" len: "); Out.Int(res, 0); Out.Ln();
+  (* Out.String("[TEST DEBUG] raw: "); Out.String(raw); Out.String(" len: "); Out.Int(res, 0); Out.Ln(); *)
   ok := HttpResponse.Parse(raw, resp);
   Tests.ExpectedBool(TRUE, ok, "Parse returns TRUE for valid response with headers", pass);
   DStrings.Init("", value);
