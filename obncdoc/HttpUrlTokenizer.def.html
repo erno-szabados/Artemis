@@ -55,7 +55,7 @@ TYPE
     Tokenizer = POINTER TO TokenizerDesc;
 
 <span class='comment'>(* Initialize tokenizer with raw URL string *)</span>
-PROCEDURE <em>Init</em>(VAR tokenizer: Tokenizer; raw: ARRAY OF CHAR);
+PROCEDURE <em>Init</em>(VAR tokenizer: Tokenizer; url: DStrings.String);
 
 <span class='comment'>(* TRUE if tokenizer has reached end of input *)</span>
 PROCEDURE <em>AtEof</em>(tokenizer: Tokenizer): BOOLEAN;

@@ -1,0 +1,18 @@
+(* HttpRequestTest.Mod - Minimal tests for HttpRequest.Mod.
+
+Copyright (C) 2025
+
+Released under The 3-Clause BSD License.
+*)
+DEFINITION HttpRequestTest;
+PROCEDURE TestInit(): BOOLEAN;
+
+PROCEDURE TestSetHeader(): BOOLEAN;
+
+PROCEDURE TestSetBody(): BOOLEAN;
+
+PROCEDURE TestSetMultilineBody(): BOOLEAN;
+
+PROCEDURE TestToString(): BOOLEAN;
+
+END HttpRequestTest.

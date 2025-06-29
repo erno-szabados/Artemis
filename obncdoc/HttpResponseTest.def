@@ -1,0 +1,16 @@
+(* HttpResponseTest.Mod - Minimal tests for HttpResponse.Mod.
+
+Copyright (C) 2025
+
+Released under The 3-Clause BSD License.
+*)
+DEFINITION HttpResponseTest;
+PROCEDURE TestInit(): BOOLEAN;
+
+PROCEDURE TestParseStub(): BOOLEAN;
+
+PROCEDURE TestParseStatusLine(): BOOLEAN;
+
+PROCEDURE TestParseHeader(): BOOLEAN;
+
+END HttpResponseTest.

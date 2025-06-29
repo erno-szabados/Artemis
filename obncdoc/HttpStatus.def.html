@@ -1,0 +1,56 @@
+<!DOCTYPE html PUBLIC '-//W3C//DTD XHTML 1.0 Strict//EN' 'http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd'>
+<html xmlns='http://www.w3.org/1999/xhtml' xml:lang='en' lang='en'>
+	<head>
+		<meta name='viewport' content='width=device-width, initial-scale=1.0' />
+		<meta http-equiv='Content-Type' content='text/html; charset=utf-8' />
+		<title>DEFINITION HttpStatus</title>
+		<link rel='stylesheet' type='text/css' href='style.css' />
+	</head>
+	<body>
+		<p><a href='index.html'>Index</a></p>
+
+		<pre>
+<span class='comment'>(* HttpStatus.Mod - Common HTTP status code constants
+
+Copyright (C) 2025 Artemis Project Contributors
+
+Released under The 3-Clause BSD License.
+*)</span>
+
+DEFINITION <em>HttpStatus</em>;
+
+CONST
+  StatusContinue = 100;
+  StatusSwitchingProtocols = 101;
+  StatusOK = 200;
+  StatusCreated = 201;
+  StatusAccepted = 202;
+  StatusNoContent = 204;
+  StatusMovedPermanently = 301;
+  StatusFound = 302;
+  StatusSeeOther = 303;
+  StatusNotModified = 304;
+  StatusBadRequest = 400;
+  StatusUnauthorized = 401;
+  StatusForbidden = 403;
+  StatusNotFound = 404;
+  StatusMethodNotAllowed = 405;
+  StatusRequestTimeout = 408;
+  StatusConflict = 409;
+  StatusGone = 410;
+  StatusLengthRequired = 411;
+  StatusPreconditionFailed = 412;
+  StatusPayloadTooLarge = 413;
+  StatusURITooLong = 414;
+  StatusUnsupportedMediaType = 415;
+  StatusExpectationFailed = 417;
+  StatusInternalServerError = 500;
+  StatusNotImplemented = 501;
+  StatusBadGateway = 502;
+  StatusServiceUnavailable = 503;
+  StatusGatewayTimeout = 504;
+  StatusHTTPVersionNotSupported = 505;
+END HttpStatus.
+</pre>
+	</body>
+</html>

@@ -1,0 +1,48 @@
+(* HttpRequest.Mod - HTTP request construction and serialization module
+
+Copyright (C) 2025 Artemis Project Contributors
+
+Released under The 3-Clause BSD License.
+*)
+
+DEFINITION HttpRequest;
+
+IMPORT DStrings, HttpHeader;
+
+TYPE
+  HttpRequest = POINTER TO HttpRequestDesc;
+  HttpRequestDesc = RECORD
+    method: DStrings.String;
+    url:    DStrings.String;
+    headers: HttpHeader.Header;
+    body:   DStrings.String
+  END;
+
+(* Initializes a new HTTP request with the given method and url/path. *)
+PROCEDURE Init(method, url: ARRAY OF CHAR; VAR req: HttpRequest);
+
+(* Sets a header field (case-insensitive). Accepts ARRAY OF CHAR for ergonomics. *)
+PROCEDURE SetHeader(req: HttpRequest; key, value: ARRAY OF CHAR): BOOLEAN;
+
+(* Sets the request body from an ARRAY OF CHAR. *)
+PROCEDURE SetBody(req: HttpRequest; body: ARRAY OF CHAR): BOOLEAN;
+
+(* Sets the request body from a DStrings.String. *)
+PROCEDURE SetBodyDString(req: HttpRequest; body: DStrings.String): BOOLEAN;
+
+(* Serializes the request into a DStrings.String for sending. *)
+PROCEDURE ToString(req: HttpRequest; VAR out: DStrings.String): BOOLEAN;
+
+(* Gets the value of a header field (case-insensitive). Returns TRUE if found. *)
+PROCEDURE GetHeader(req: HttpRequest; key: ARRAY OF CHAR; VAR value: DStrings.String): BOOLEAN;
+
+(* Gets the request method as a DStrings.String. *)
+PROCEDURE GetMethod(req: HttpRequest; VAR method: DStrings.String);
+
+(* Gets the request URL/path as a DStrings.String. *)
+PROCEDURE GetUrl(req: HttpRequest; VAR url: DStrings.String);
+
+(* Gets the request body as a DStrings.String. *)
+PROCEDURE GetBody(req: HttpRequest; VAR body: DStrings.String);
+
+END HttpRequest.

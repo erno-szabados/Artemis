@@ -1,0 +1,53 @@
+(* HttpResponse.Mod - HTTP response parsing and representation module
+
+Copyright (C) 2025 Artemis Project Contributors
+
+Released under The 3-Clause BSD License.
+*)
+
+DEFINITION HttpResponse;
+
+IMPORT DStrings, HttpHeader;
+
+CONST
+  Ok = 0;
+  ParseError = 1;
+  Incomplete = 2;
+  Unsupported = 3;
+
+TYPE
+  HttpResponse = POINTER TO HttpResponseDesc;
+  HttpResponseDesc = RECORD
+    version: DStrings.String;
+    statusCode: INTEGER;
+    reason: DStrings.String;
+    headers: HttpHeader.Header;
+    body: DStrings.String;
+    error: INTEGER
+  END;
+
+(* Parses a raw HTTP response (ARRAY OF CHAR) into a HttpResponse. Returns TRUE on success. *)
+PROCEDURE Parse(raw: ARRAY OF CHAR; VAR resp: HttpResponse): BOOLEAN;
+
+(* Returns the status code. *)
+PROCEDURE GetStatus(resp: HttpResponse): INTEGER;
+
+(* Gets the reason phrase. *)
+PROCEDURE GetReason(resp: HttpResponse; VAR reason: DStrings.String);
+
+(* Gets the HTTP version. *)
+PROCEDURE GetVersion(resp: HttpResponse; VAR version: DStrings.String);
+
+(* Gets the value of a header field (case-insensitive). Returns TRUE if found. *)
+PROCEDURE GetHeader(resp: HttpResponse; key: ARRAY OF CHAR; VAR value: DStrings.String): BOOLEAN;
+
+(* Gets the response body. *)
+PROCEDURE GetBody(resp: HttpResponse; VAR body: DStrings.String);
+
+(* Returns TRUE if the response was parsed without error. *)
+PROCEDURE IsOk(resp: HttpResponse): BOOLEAN;
+
+(* Initializes a HttpResponse descriptor to safe defaults. *)
+PROCEDURE Init(VAR resp: HttpResponse);
+
+END HttpResponse.

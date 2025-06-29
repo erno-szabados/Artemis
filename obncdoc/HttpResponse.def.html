@@ -1,0 +1,68 @@
+<!DOCTYPE html PUBLIC '-//W3C//DTD XHTML 1.0 Strict//EN' 'http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd'>
+<html xmlns='http://www.w3.org/1999/xhtml' xml:lang='en' lang='en'>
+	<head>
+		<meta name='viewport' content='width=device-width, initial-scale=1.0' />
+		<meta http-equiv='Content-Type' content='text/html; charset=utf-8' />
+		<title>DEFINITION HttpResponse</title>
+		<link rel='stylesheet' type='text/css' href='style.css' />
+	</head>
+	<body>
+		<p><a href='index.html'>Index</a></p>
+
+		<pre>
+<span class='comment'>(* HttpResponse.Mod - HTTP response parsing and representation module
+
+Copyright (C) 2025 Artemis Project Contributors
+
+Released under The 3-Clause BSD License.
+*)</span>
+
+DEFINITION <em>HttpResponse</em>;
+
+IMPORT DStrings, HttpHeader;
+
+CONST
+  Ok = 0;
+  ParseError = 1;
+  Incomplete = 2;
+  Unsupported = 3;
+
+TYPE
+  HttpResponse = POINTER TO HttpResponseDesc;
+  HttpResponseDesc = RECORD
+    version: DStrings.String;
+    statusCode: INTEGER;
+    reason: DStrings.String;
+    headers: HttpHeader.Header;
+    body: DStrings.String;
+    error: INTEGER
+  END;
+
+<span class='comment'>(* Parses a raw HTTP response (ARRAY OF CHAR) into a HttpResponse. Returns TRUE on success. *)</span>
+PROCEDURE <em>Parse</em>(raw: ARRAY OF CHAR; VAR resp: HttpResponse): BOOLEAN;
+
+<span class='comment'>(* Returns the status code. *)</span>
+PROCEDURE <em>GetStatus</em>(resp: HttpResponse): INTEGER;
+
+<span class='comment'>(* Gets the reason phrase. *)</span>
+PROCEDURE <em>GetReason</em>(resp: HttpResponse; VAR reason: DStrings.String);
+
+<span class='comment'>(* Gets the HTTP version. *)</span>
+PROCEDURE <em>GetVersion</em>(resp: HttpResponse; VAR version: DStrings.String);
+
+<span class='comment'>(* Gets the value of a header field (case-insensitive). Returns TRUE if found. *)</span>
+PROCEDURE <em>GetHeader</em>(resp: HttpResponse; key: ARRAY OF CHAR; VAR value: DStrings.String): BOOLEAN;
+
+<span class='comment'>(* Gets the response body. *)</span>
+PROCEDURE <em>GetBody</em>(resp: HttpResponse; VAR body: DStrings.String);
+
+<span class='comment'>(* Returns TRUE if the response was parsed without error. *)</span>
+PROCEDURE <em>IsOk</em>(resp: HttpResponse): BOOLEAN;
+
+<span class='comment'>(* Initializes a HttpResponse descriptor to safe defaults. *)</span>
+PROCEDURE <em>Init</em>(VAR resp: HttpResponse);
+
+END HttpResponse.
+</pre>
+	</body>
+</html>

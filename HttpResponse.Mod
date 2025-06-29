@@ -251,7 +251,7 @@ BEGIN
   RETURN result
 END IsOk;
 
-(* Initializes a HttpResponse descriptor to safe defaults. *)
+(** Initializes a HttpResponse descriptor to safe defaults. *)
 PROCEDURE Init*(VAR resp: HttpResponse);
 BEGIN
   IF resp = NIL THEN

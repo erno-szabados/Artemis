@@ -59,6 +59,12 @@ PROCEDURE <em>Set</em>(h: Header; key, value: ARRAY OF CHAR): BOOLEAN;
 PROCEDURE <em>Remove</em>(h: Header; key: ARRAY OF CHAR): BOOLEAN;
 
 <span class='comment'>(*
+  Parses a DStrings.String HTTP header text into the header structure. Returns TRUE on success.
+  Handles line splitting, key/value separation, whitespace trimming, and case normalization.
+*)</span>
+PROCEDURE <em>ParseDString</em>(input: DStrings.String; VAR h: Header): BOOLEAN;
+
+<span class='comment'>(*
   Parses raw HTTP header text into the header structure. Returns TRUE on success.
   Handles line splitting, key/value separation, whitespace trimming, and case normalization.
 *)</span>

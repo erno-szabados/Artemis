@@ -1,0 +1,63 @@
+<!DOCTYPE html PUBLIC '-//W3C//DTD XHTML 1.0 Strict//EN' 'http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd'>
+<html xmlns='http://www.w3.org/1999/xhtml' xml:lang='en' lang='en'>
+	<head>
+		<meta name='viewport' content='width=device-width, initial-scale=1.0' />
+		<meta http-equiv='Content-Type' content='text/html; charset=utf-8' />
+		<title>DEFINITION HttpRequest</title>
+		<link rel='stylesheet' type='text/css' href='style.css' />
+	</head>
+	<body>
+		<p><a href='index.html'>Index</a></p>
+
+		<pre>
+<span class='comment'>(* HttpRequest.Mod - HTTP request construction and serialization module
+
+Copyright (C) 2025 Artemis Project Contributors
+
+Released under The 3-Clause BSD License.
+*)</span>
+
+DEFINITION <em>HttpRequest</em>;
+
+IMPORT DStrings, HttpHeader;
+
+TYPE
+  HttpRequest = POINTER TO HttpRequestDesc;
+  HttpRequestDesc = RECORD
+    method: DStrings.String;
+    url:    DStrings.String;
+    headers: HttpHeader.Header;
+    body:   DStrings.String
+  END;
+
+<span class='comment'>(* Initializes a new HTTP request with the given method and url/path. *)</span>
+PROCEDURE <em>Init</em>(method, url: ARRAY OF CHAR; VAR req: HttpRequest);
+
+<span class='comment'>(* Sets a header field (case-insensitive). Accepts ARRAY OF CHAR for ergonomics. *)</span>
+PROCEDURE <em>SetHeader</em>(req: HttpRequest; key, value: ARRAY OF CHAR): BOOLEAN;
+
+<span class='comment'>(* Sets the request body from an ARRAY OF CHAR. *)</span>
+PROCEDURE <em>SetBody</em>(req: HttpRequest; body: ARRAY OF CHAR): BOOLEAN;
+
+<span class='comment'>(* Sets the request body from a DStrings.String. *)</span>
+PROCEDURE <em>SetBodyDString</em>(req: HttpRequest; body: DStrings.String): BOOLEAN;
+
+<span class='comment'>(* Serializes the request into a DStrings.String for sending. *)</span>
+PROCEDURE <em>ToString</em>(req: HttpRequest; VAR out: DStrings.String): BOOLEAN;
+
+<span class='comment'>(* Gets the value of a header field (case-insensitive). Returns TRUE if found. *)</span>
+PROCEDURE <em>GetHeader</em>(req: HttpRequest; key: ARRAY OF CHAR; VAR value: DStrings.String): BOOLEAN;
+
+<span class='comment'>(* Gets the request method as a DStrings.String. *)</span>
+PROCEDURE <em>GetMethod</em>(req: HttpRequest; VAR method: DStrings.String);
+
+<span class='comment'>(* Gets the request URL/path as a DStrings.String. *)</span>
+PROCEDURE <em>GetUrl</em>(req: HttpRequest; VAR url: DStrings.String);
+
+<span class='comment'>(* Gets the request body as a DStrings.String. *)</span>
+PROCEDURE <em>GetBody</em>(req: HttpRequest; VAR body: DStrings.String);
+
+END HttpRequest.
+</pre>
+	</body>
+</html>

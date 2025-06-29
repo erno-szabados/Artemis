@@ -43,7 +43,7 @@ TYPE
     Tokenizer = POINTER TO TokenizerDesc;
 
 (* Initialize tokenizer with raw URL string *)
-PROCEDURE Init(VAR tokenizer: Tokenizer; raw: ARRAY OF CHAR);
+PROCEDURE Init(VAR tokenizer: Tokenizer; url: DStrings.String);
 
 (* TRUE if tokenizer has reached end of input *)
 PROCEDURE AtEof(tokenizer: Tokenizer): BOOLEAN;
