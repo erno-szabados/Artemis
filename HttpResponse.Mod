@@ -7,6 +7,14 @@ Released under The 3-Clause BSD License.
 
 MODULE HttpResponse;
 
+(* TODO
+  Create a dictionary to register procedures for header attributes:
+  This will allow some flexibility in handling headers.
+- Add support for chunked transfer encoding
+- Add Content-Length header handling
+
+ *)
+
 IMPORT DStrings, HttpHeader, Chars, extConvert;
 
 CONST
