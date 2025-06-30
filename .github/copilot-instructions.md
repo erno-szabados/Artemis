@@ -8,7 +8,6 @@
   - Function return values **must be handled**.
   - Return is only allowed as the last statement in a procedure. Use a `result` variable for returning values.
   - Early returns are not valid in Oberon-07. EXIT is not a valid oberon keyword.
-  - Procedures within procedures are not valid in Oberon-07.
   - Procedure definitions must precede their calls.
   - Forward declarations for procedures are not valid in Oberon-07 (only for pointers).
   - A situation requiring mutual recursion can be handled by using procedure types to make indirect calls.
@@ -19,14 +18,17 @@
   - You cannot substitute a procedure into SYSTEM.VAL(), use a local variable in such cases.
   - Oberon-07 reintroduced FOR loops, so **use them instead of WHILE loops where appropriate**.
   - There is no enumeration type in oberon 07. use INTEGER. 
+  - Local procedures cannot be passed as procedure variables. 
   - Oberon does not support escape sequences, 
-    the correct approach is to user a combination of a rider-based DStrings write operations 
+    Instead of escape sequences use a combination of a rider-based DStrings write operations 
     and Chars.CR and similar constants from `Chars.mod`.
 - **Best Practices**
   - Functions and procedures should be clear, concise, and well-structured.
   - Use helper functions to avoid code duplication.
   - Use modules to encapsulate functionality. Use opaque pointers to expose necessary types. Hide implementation details.
   - Export only what is necessary; keep the interface clean.
+  - Local procedures (procedures defined inside other procedures) can promote cleaner code organization by grouping related code together. 
+  - Local procedures can make deeply nested code. Use with care.
   - Use meaningful names for modules, procedures, and variables.
   - Use PascalCase for module names, constants and procedures and camelCase for variables.
 
@@ -53,31 +55,3 @@
 - Internal procedures documentation comment lines start with `(*` and end with `*)`, so they are not included in the API documentation.
 - The header should contain a copyright notice for the 3 clause BSD license, the module name, a brief description, and the author.
 - Be conservative and factual in documentation statements, do not exaggerate.
-
-## Creating C wrappers
-
-1. Create a file named M.obn with the the exported declarations.
-   Proper Procedures should have empty bodies to satisfy syntax requirements.
-   Example: `PROCEDURE MyProc; BEGIN END MyProc;` 
-   Function procedures should have a dummy return value to satisfy syntax requirements.
-   Example: `PROCEDURE MyFunc() : BOOLEAN; BEGIN RETURN TRUE END MyFunc;` 
-
-2. Create a file named MTest.obn which imports M (and preferably  write
-    unit tests for M)
-3. Build MTest with the command
-        obnc MTest.obn
-4. Copy the generated file .obnc/M.c to the current directory. In M.c,
-    delete the generator comment on the first line.
-5. Copy the generated file .obnc/M.h to the current directory.
-6. Implement M.c. Update M.h as needed.
-
-### Notes on C Wrappers
-
-1. The initialization function M__Init is called each time a client
-  module imports M. Its statements should therefore be  guarded  with an
-  initialization flag to make sure they are executed only once.
-2. To use pointers to C structures, declare INTEGERS in oberon, 
-   OBNC_INTEGER is 32-bit, Oberon has no way to represent 64-bit integers. 
-   Therefore you have to update the generated code: the relevant casts should be revised, 
-   and uintptr_t should be used instead of OBNC_INTEGER.
-   This works as long as there is no direct access to the structure fields from Oberon code.
