@@ -1,21 +1,18 @@
-(** SocketDStream.Mod - Buffered, sequential socket I/O using DStrings and Riders
+(** SocketDStream.Mod 
 
   Copyright (C) 2025 Artemis Project Contributors
   Released under The 3-Clause BSD License.
 
-  This module provides a DString-based, rider-friendly abstraction for nonblocking socket I/O.
-  It is not a Java-style stream, but an idiomatic Oberon-07 approach for sequential socket data.
-  
+  Buffered, sequential socket I/O using DStrings and Riders.
+  The API manages partial sends/receives and nonblocking socket state internally.
+
   Usage:
     IMPORT SocketDStream;
     SocketDStream.WriteDString(...);
 
     (* Or, for brevity: *)
-    IMPORT SocketDStream AS SDStream;
+    IMPORT SDStream := SocketDStream;
     SDStream.WriteDString(...);
-
-  The API is designed for use with DStrings and Riders, and manages partial
-  sends/receives and nonblocking socket state internally.
 *)
 MODULE SocketDStream;
 
@@ -25,8 +22,8 @@ TYPE
   SocketDStream* = POINTER TO SocketDStreamDesc;
   SocketDStreamDesc* = RECORD
     socket: artSocket.Socket;
-    inBuf, outBuf: DStrings.String;
-    inRider, outRider: DStrings.Rider
+    inBuf*, outBuf*: DStrings.String;
+    inRider*, outRider*: DStrings.Rider
     (* Additional state for partial I/O, etc. *)
   END;
 
