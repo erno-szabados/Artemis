@@ -45,7 +45,7 @@ END LogInfoWithData;
 BEGIN
   done := FALSE;
   logger := Log.New(Log.INFO, Log.CONSOLE, "");
-  Log.Info(logger, "Starting server on port 12345");
+  Log.Info(logger, "Starting server...");
 
   serverSock := artSocket.NewSocket();
   IF serverSock = NIL THEN
@@ -76,7 +76,7 @@ BEGIN
   END;
 
   IF ~done THEN
-    Log.Info(logger, "Server listening on port 12345");
+    Log.Info(logger, "Listening on port 12345");
     REPEAT
       done := FALSE;
       clientSock := NIL;

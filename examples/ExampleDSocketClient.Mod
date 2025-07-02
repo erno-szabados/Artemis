@@ -11,7 +11,7 @@ and logs all steps using the Log module. All I/O is performed using DStrings and
 *)
 MODULE ExampleDSocketClient;
 
-IMPORT artSocket, SocketDStream, DStrings, Chars, Log, In;
+IMPORT artSocket, artSleep, SocketDStream, DStrings, Chars, Log, In;
 
 CONST
   SERVER_ADDR = "127.0.0.1";
@@ -21,10 +21,8 @@ CONST
 VAR
   sock: artSocket.Socket;
   stream: SocketDStream.SocketDStream;
-  dstr: DStrings.String;
-  bytesLeft, status: INTEGER;
   logger: Log.Logger;
-  done: BOOLEAN;
+  recvResult: BOOLEAN;
   buf: ARRAY BUFSIZE OF CHAR;
 
 PROCEDURE LogErrorWithCode(logger: Log.Logger; msg: ARRAY OF CHAR; code: INTEGER);
@@ -44,73 +42,106 @@ BEGIN
   Log.Info(logger, msg)
 END LogInfoWithData;
 
+PROCEDURE InitLogger(VAR logger: Log.Logger);
 BEGIN
-  done := FALSE;
   logger := Log.New(Log.INFO, Log.CONSOLE, "");
-  Log.Info(logger, "Starting DSocket client");
+  Log.Info(logger, "Starting DSocket client")
+END InitLogger;
 
-  In.Open;
-
+PROCEDURE OpenSocket(VAR sock: artSocket.Socket; logger: Log.Logger): BOOLEAN;
+VAR ok: BOOLEAN;
+BEGIN
   sock := artSocket.NewSocket();
   IF sock = NIL THEN
     Log.Error(logger, "Failed to create socket");
     Log.Close(logger);
-    done := TRUE
+    ok := FALSE
+  ELSE
+    ok := TRUE
   END;
+  RETURN ok
+END OpenSocket;
 
-  IF ~done THEN
-    status := artSocket.Connect(sock, SERVER_ADDR, PORT);
-    IF (status # artSocket.Ok) & (status # artSocket.InProgress) THEN
-      LogErrorWithCode(logger, "Connect failed: ", status);
-      artSocket.Close(sock);
-      Log.Close(logger);
-      done := TRUE
+PROCEDURE ConnectToServer(sock: artSocket.Socket; logger: Log.Logger): BOOLEAN;
+VAR status: INTEGER; ok: BOOLEAN;
+BEGIN
+  status := artSocket.Connect(sock, SERVER_ADDR, PORT);
+  IF (status # artSocket.Ok) & (status # artSocket.InProgress) THEN
+    LogErrorWithCode(logger, "Connect failed: ", status);
+    artSocket.Close(sock);
+    Log.Close(logger);
+    ok := FALSE
+  ELSE
+    ok := TRUE
+  END;
+  RETURN ok
+END ConnectToServer;
+
+PROCEDURE SendLine(stream: SocketDStream.SocketDStream; logger: Log.Logger; buf: ARRAY OF CHAR): BOOLEAN;
+VAR dstr: DStrings.String; bytesLeft, status: INTEGER; ok: BOOLEAN;
+BEGIN
+  DStrings.Init("", dstr);
+  DStrings.CopyChars(buf, dstr);
+  LogInfoWithData(logger, "Sending: ", buf);
+  REPEAT
+    status := SocketDStream.SendDString(stream, dstr, bytesLeft);
+    IF (status = artSocket.WouldBlock) THEN
+      artSleep.Millis(1000);
+      Log.Info(logger, "Still waiting to send...")
+    ELSIF status # artSocket.Ok THEN
+      LogErrorWithCode(logger, "Send failed: ", status);
+      ok := FALSE
     END
+  UNTIL (bytesLeft = 0) OR (status # artSocket.Ok);
+  IF status = artSocket.Ok THEN
+    LogInfoWithData(logger, "Sent: ", buf);
+    ok := TRUE
   END;
+  RETURN ok
+END SendLine;
 
-  IF ~done THEN
-    SocketDStream.Init(sock, stream);
-    DStrings.Init("", dstr);
-    In.Line(buf);
-    DStrings.CopyChars(buf, dstr);
-    LogInfoWithData(logger, "Sending: ", buf);
-    DStrings.Set(stream.outRider, stream.outBuf, 0);
-    DStrings.Copy(dstr, stream.outBuf);
-    bytesLeft := DStrings.Length(stream.outBuf);
-    REPEAT
-      status := SocketDStream.WriteDString(stream, bytesLeft);
-      IF (status = artSocket.WouldBlock) THEN
-        (* Optionally yield or retry here *)
-      ELSIF status # artSocket.Ok THEN
-        LogErrorWithCode(logger, "Send failed: ", status);
-        done := TRUE
-      END
-    UNTIL (bytesLeft = 0) OR done;
-    IF ~done THEN LogInfoWithData(logger, "Sent: ", buf) END
-  END;
-
-  IF ~done THEN
-    (* Read response loop *)
-    DStrings.Init("", dstr);
-    DStrings.Set(stream.inRider, stream.inBuf, 0);
-    bytesLeft := 1;
-    REPEAT
-      status := SocketDStream.ReadDString(stream, bytesLeft);
-      IF (status = artSocket.WouldBlock) THEN
-        (* Optionally yield or sleep here *)
-      ELSIF status # artSocket.Ok THEN
-        LogErrorWithCode(logger, "Receive failed: ", status);
-        done := TRUE
-      END
-    UNTIL (bytesLeft > 0) OR done;
-    IF ~done THEN
-      DStrings.ToChars(stream.inBuf, buf, bytesLeft);
-      buf[bytesLeft] := 0X;
-      LogInfoWithData(logger, "Received: ", buf)
+PROCEDURE ReceiveResponse(stream: SocketDStream.SocketDStream; logger: Log.Logger; VAR buf: ARRAY OF CHAR): BOOLEAN;
+VAR dstr: DStrings.String; bytesRead, status: INTEGER; ok, found: BOOLEAN;
+  delim: ARRAY 2 OF CHAR;
+BEGIN
+  DStrings.Init("", dstr);
+  delim[0] := Chars.LF; delim[1] := 0X;
+  REPEAT
+    status := SocketDStream.ReadUntil(stream, delim, dstr, found);
+    IF (status = artSocket.WouldBlock) THEN
+      artSleep.Millis(100)
+    ELSIF status # artSocket.Ok THEN
+      LogErrorWithCode(logger, "Receive failed: ", status);
+      ok := FALSE
     END
+  UNTIL found OR (status # artSocket.Ok);
+  IF (status = artSocket.Ok) & found THEN
+    DStrings.ToChars(dstr, buf, bytesRead);
+    buf[bytesRead] := 0X;
+    LogInfoWithData(logger, "Received: ", buf);
+    ok := TRUE
   END;
+  RETURN ok
+END ReceiveResponse;
 
+PROCEDURE Cleanup(sock: artSocket.Socket; logger: Log.Logger);
+BEGIN
   IF sock # NIL THEN artSocket.Close(sock) END;
   Log.Info(logger, "DSocket client done");
-  Log.Close(logger);
+  Log.Close(logger)
+END Cleanup;
+
+BEGIN
+  InitLogger(logger);
+  In.Open;
+  IF OpenSocket(sock, logger) THEN
+    IF ConnectToServer(sock, logger) THEN
+      SocketDStream.Init(sock, stream);
+      In.Line(buf);
+      IF SendLine(stream, logger, buf) THEN
+       recvResult := ReceiveResponse(stream, logger, buf)
+      END
+    END;
+    Cleanup(sock, logger)
+  END
 END ExampleDSocketClient.
