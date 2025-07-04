@@ -75,7 +75,7 @@ BEGIN
 END Connect;
 
 (** Send data (non-blocking). Returns error code, number of bytes sent in VAR parameter. *)
-PROCEDURE Send*(s: Socket; data: ARRAY OF CHAR; len: INTEGER; VAR sent: INTEGER) : INTEGER;
+PROCEDURE Send*(s: Socket; data: ARRAY OF BYTE; len: INTEGER; VAR sent: INTEGER) : INTEGER;
 BEGIN
   (* Placeholder. Implementation in C wrapper. *)
   sent := 0;
@@ -83,7 +83,7 @@ BEGIN
 END Send;
 
 (** Receive data (non-blocking). Returns error code, number of bytes received in VAR parameter. *)
-PROCEDURE Receive*(s: Socket; VAR data: ARRAY OF CHAR; maxLen: INTEGER; VAR received: INTEGER) : INTEGER;
+PROCEDURE Receive*(s: Socket; VAR data: ARRAY OF BYTE; maxLen: INTEGER; VAR received: INTEGER) : INTEGER;
 BEGIN
   (* Placeholder. Implementation in C wrapper. *)
   received := 0;

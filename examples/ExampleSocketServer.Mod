@@ -6,12 +6,12 @@ Released under The 3-Clause BSD License.
 See https://opensource.org/licenses/BSD-3-Clause
 
 This example demonstrates a minimal TCP server using the artSocket module.
-It accepts a single client, reads a line of text, capitalizes it using Chars.Cap,
-and sends it back. Logging is performed using the Log module.
+It accepts a single client, reads a line of text and echoes it back.
+Logging is performed using the Log module.
 *)
 MODULE ExampleSocketServer;
 
-IMPORT artSleep, artSocket, Chars, Log;
+IMPORT artSleep, artSocket, Chars, Log, SocketDStream, DStrings;
 
 CONST
   PORT = 12345;
@@ -19,11 +19,12 @@ CONST
 
 VAR
   serverSock, clientSock: artSocket.Socket;
+  stream: SocketDStream.SocketDStream;
+  dstr: DStrings.String;
+  rider : DStrings.Rider;
   addr: ARRAY 16 OF CHAR;
-  buf: ARRAY BUFSIZE OF CHAR;
-  n, err: INTEGER;
   logger: Log.Logger;
-  done: BOOLEAN;
+  closed, done: BOOLEAN;
 
 PROCEDURE LogErrorWithCode(logger: Log.Logger; msg: ARRAY OF CHAR; code: INTEGER);
 VAR fullMsg, numStr: ARRAY 64 OF CHAR; ok: BOOLEAN;
@@ -34,13 +35,78 @@ BEGIN
   Log.Error(logger, fullMsg)
 END LogErrorWithCode;
 
-PROCEDURE LogInfoWithData(logger: Log.Logger; label: ARRAY OF CHAR; data: ARRAY OF CHAR);
-VAR msg: ARRAY 2*BUFSIZE OF CHAR;
+PROCEDURE LogInfoWithData(logger: Log.Logger; label: ARRAY OF CHAR; data: DStrings.String);
+VAR msg: ARRAY 2*BUFSIZE OF CHAR; tmp: ARRAY BUFSIZE OF CHAR; truncated: INTEGER;
 BEGIN
   Chars.Copy(label, msg);
-  Chars.Append(data, msg);
+  DStrings.ToChars(data, tmp, truncated);
+  Chars.Append(tmp, msg);
   Log.Info(logger, msg)
 END LogInfoWithData;
+
+(* Accept a client connection, blocking until one is available or error *)
+PROCEDURE AcceptClient(serverSock: artSocket.Socket; VAR clientSock: artSocket.Socket; logger: Log.Logger; VAR done: BOOLEAN);
+VAR err: INTEGER;
+BEGIN
+  done := FALSE;
+  clientSock := NIL;
+  REPEAT
+    clientSock := artSocket.Accept(serverSock, err);
+    IF clientSock = NIL THEN
+      IF err = artSocket.WouldBlock THEN
+        artSleep.Millis(100);
+      ELSE
+        LogErrorWithCode(logger, "Accept failed: ", err);
+        done := TRUE
+      END
+    END
+  UNTIL (clientSock # NIL) OR done;
+END AcceptClient;
+
+(* Read a line from the client using SocketDStream, returns FALSE if connection closed or error *)
+PROCEDURE ReadLine(stream: SocketDStream.SocketDStream; VAR dstr: DStrings.String; logger: Log.Logger; VAR closed: BOOLEAN): BOOLEAN;
+VAR found: BOOLEAN; status: INTEGER; result: BOOLEAN;
+BEGIN
+  closed := FALSE;
+  DStrings.Init("", dstr);
+  result := FALSE;
+  found := FALSE;
+  WHILE ~found & ~closed DO
+    status := SocketDStream.ReadUntil(stream, Chars.LF, dstr, found);
+    IF status = artSocket.Ok THEN
+      IF found THEN
+        LogInfoWithData(logger, "Received: ", dstr);
+        result := TRUE
+      END
+    ELSIF status = artSocket.WouldBlock THEN
+      (* Partial read, wait for more data *)
+      artSleep.Millis(100);
+    ELSE
+      LogErrorWithCode(logger, "Read failed: ", status);
+      closed := TRUE;
+      result := FALSE
+    END
+  END;
+  RETURN result
+END ReadLine;
+
+(* Write a string to the client using SocketDStream *)
+PROCEDURE WriteLine(stream: SocketDStream.SocketDStream; dstr: DStrings.String; logger: Log.Logger; VAR done: BOOLEAN);
+VAR bytesLeft, status: INTEGER;
+BEGIN
+  bytesLeft := 0;
+  done := FALSE;
+  status := SocketDStream.SendDString(stream, dstr, bytesLeft);
+  WHILE ((status = artSocket.Ok) OR (status = artSocket.WouldBlock)) & (bytesLeft > 0) & ~done DO
+    status := SocketDStream.SendDString(stream, dstr, bytesLeft);
+  END;
+  IF (status = artSocket.Ok) OR (status = artSocket.WouldBlock) THEN
+    LogInfoWithData(logger, "Sent: ", dstr)
+  ELSE
+    LogErrorWithCode(logger, "Write failed: ", status);
+    done := TRUE
+  END
+END WriteLine;
 
 BEGIN
   done := FALSE;
@@ -56,9 +122,8 @@ BEGIN
 
   IF ~done THEN
     addr := "127.0.0.1";
-    err := artSocket.Bind(serverSock, addr, PORT);
-    IF err # artSocket.Ok THEN
-      LogErrorWithCode(logger, "Bind failed: ", err);
+    IF artSocket.Bind(serverSock, addr, PORT) # artSocket.Ok THEN
+      LogErrorWithCode(logger, "Bind failed: ", artSocket.Bind(serverSock, addr, PORT));
       artSocket.Close(serverSock);
       Log.Close(logger);
       done := TRUE
@@ -66,9 +131,8 @@ BEGIN
   END;
 
   IF ~done THEN
-    err := artSocket.Listen(serverSock, 1);
-    IF err # artSocket.Ok THEN
-      LogErrorWithCode(logger, "Listen failed: ", err);
+    IF artSocket.Listen(serverSock, 1) # artSocket.Ok THEN
+      LogErrorWithCode(logger, "Listen failed: ", artSocket.Listen(serverSock, 1));
       artSocket.Close(serverSock);
       Log.Close(logger);
       done := TRUE
@@ -78,58 +142,20 @@ BEGIN
   IF ~done THEN
     Log.Info(logger, "Listening on port 12345");
     REPEAT
-      done := FALSE;
-      clientSock := NIL;
-      (* Accept loop *)
-      REPEAT
-        clientSock := artSocket.Accept(serverSock, err);
-        IF clientSock = NIL THEN
-          IF err = artSocket.WouldBlock THEN
-            artSleep.Millis(100);
-            (* Optionally yield or sleep here *)
-          ELSE
-            LogErrorWithCode(logger, "Accept failed: ", err);
-            done := TRUE
-          END
-        END
-      UNTIL (clientSock # NIL) OR done;
-
+      AcceptClient(serverSock, clientSock, logger, done);
       IF ~done THEN
         Log.Info(logger, "Client connected");
-        (* Read loop *)
+        SocketDStream.Init(clientSock, stream);
+        closed := FALSE;
         REPEAT
-          n := 0;
-          err := artSocket.Receive(clientSock, buf, BUFSIZE, n);
-          IF n > 0 THEN
-            buf[n] := 0X;
-            LogInfoWithData(logger, "Received: ", buf);
-            Chars.Cap(buf);
-            (* Write loop *)
-            REPEAT
-              n := 0;
-              err := artSocket.Send(clientSock, buf, Chars.Length(buf), n);
-              IF n > 0 THEN
-                LogInfoWithData(logger, "Sent: ", buf)
-              ELSIF err = artSocket.WouldBlock THEN
-                (* Optionally yield or sleep here *)
-              ELSE
-                LogErrorWithCode(logger, "Write failed: ", err);
-                done := TRUE
-              END
-            UNTIL (n > 0) OR done;
-          ELSIF err = artSocket.WouldBlock THEN
-            (* Optionally yield or sleep here *)
-          ELSIF (n = 0) & (err = artSocket.Ok) THEN
-            (* Client closed connection cleanly *)
-            done := TRUE
-          ELSE
-            LogErrorWithCode(logger, "Read failed: ", err);
-            done := TRUE
+          IF ReadLine(stream, dstr, logger, closed) THEN
+            DStrings.Set(rider, dstr, DStrings.Length(dstr));
+            DStrings.WriteChar(rider, Chars.LF);
+            WriteLine(stream, dstr, logger, done)
           END
-        UNTIL (n > 0) OR done;
-      END;
-
-      IF clientSock # NIL THEN artSocket.Close(clientSock) END;
+        UNTIL closed OR done;
+        IF clientSock # NIL THEN artSocket.Close(clientSock) END;
+      END
     UNTIL FALSE
   END;
   IF serverSock # NIL THEN artSocket.Close(serverSock) END;

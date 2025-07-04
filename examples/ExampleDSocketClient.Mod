@@ -102,10 +102,12 @@ END SendLine;
 
 PROCEDURE ReceiveResponse(stream: SocketDStream.SocketDStream; logger: Log.Logger; VAR buf: ARRAY OF CHAR): BOOLEAN;
 VAR dstr: DStrings.String; bytesRead, status: INTEGER; ok, found: BOOLEAN;
-  delim: ARRAY 2 OF CHAR;
+  delim: ARRAY 1 OF CHAR;
 BEGIN
   DStrings.Init("", dstr);
-  delim[0] := Chars.LF; delim[1] := 0X;
+  delim[0] := Chars.LF; (* Use LF as delimiter *)
+  found := FALSE;
+  ok := TRUE;
   REPEAT
     status := SocketDStream.ReadUntil(stream, delim, dstr, found);
     IF (status = artSocket.WouldBlock) THEN
@@ -114,10 +116,10 @@ BEGIN
       LogErrorWithCode(logger, "Receive failed: ", status);
       ok := FALSE
     END
-  UNTIL found OR (status # artSocket.Ok);
+  UNTIL found;
   IF (status = artSocket.Ok) & found THEN
     DStrings.ToChars(dstr, buf, bytesRead);
-    buf[bytesRead] := 0X;
+    (* buf[bytesRead] := 0X; *)
     LogInfoWithData(logger, "Received: ", buf);
     ok := TRUE
   END;
@@ -138,6 +140,7 @@ BEGIN
     IF ConnectToServer(sock, logger) THEN
       SocketDStream.Init(sock, stream);
       In.Line(buf);
+      Chars.Append(Chars.LF, buf);
       IF SendLine(stream, logger, buf) THEN
        recvResult := ReceiveResponse(stream, logger, buf)
       END
