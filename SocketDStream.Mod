@@ -7,12 +7,11 @@
   The API manages partial sends/receives and nonblocking socket state internally.
 
   Usage:
-    IMPORT SocketDStream;
-    SocketDStream.WriteDString(...);
-
-    (* Or, for brevity: *)
     IMPORT SDStream := SocketDStream;
-    SDStream.WriteDString(...);
+
+    (* Declare and initialize the DStrings.String data *)
+    SDStream.Init(mySocket, myStream);
+    SDStream.WriteDString(myStream, data);
 *)
 MODULE SocketDStream;
 
@@ -41,7 +40,13 @@ BEGIN
   Log.Info(logger, msg)
 END LogInfoWithData;
 
-(** Initializes a new SocketDStream for the given socket. *)
+(** 
+  Initializes a new SocketDStream using the given socket.
+  Initialize and reset the buffers and the associated riders.
+
+  @param socket - an initialized artSocket.
+  @param stream - the socket stream to initialize.
+ *)
 PROCEDURE Init*(socket: artSocket.Socket; VAR stream: SocketDStream);
 BEGIN
   IF stream = NIL THEN
@@ -62,12 +67,12 @@ END Init;
   You should call SendDString repeatedly as long as it returns WouldBlock or Ok, until all data is sent,
   because we consume data from the stream buffer with each call. 
 
-  sstr -> source DString to send. If the stream buffer is empty, we fill it with the new data from sstr.
-  bytesLeft -> remaining unsent data. bytesLeft is always calculated from the current length of 
-  the stream buffer after each send, because the buffer is dynamic and can be modified 
-  (e.g., partial sends, deletions, appends). 
+  @param sstr - source DString to send. If the stream buffer is empty, we fill it with the new data from sstr.
+  @param bytesLeft - remaining unsent data. bytesLeft is always calculated from the current length of 
+         the stream buffer after each send, because the buffer is dynamic and can be modified 
+         (e.g., partial sends, deletions, appends). 
 
-  Returns the status of the operation (Ok, WouldBlock, etc).
+  @return the status of the operation (Ok, WouldBlock, etc).
  *)
 PROCEDURE SendDString*(stream: SocketDStream; sstr: DStrings.String; VAR bytesLeft: INTEGER): INTEGER;
 VAR
@@ -78,44 +83,42 @@ VAR
   done: BOOLEAN;
 BEGIN
   done := FALSE;
-  IF stream = NIL THEN
-    bytesLeft := 0;
-    result := artSocket.NotConnected;
+  result := artSocket.UnknownError;
+  bytesLeft := 0;
+
+  (* Validate arguments *)
+  IF (stream = NIL) OR (stream.socket = NIL) OR (sstr = NIL) THEN
     done := TRUE
   END;
+
   IF ~done THEN
-    bytesLeft := 0;
-    result := artSocket.UnknownError;
-    IF (stream # NIL) & (stream.socket # NIL) THEN
-      (* If there is no pending data, copy new data into outBuf *)
-      IF DStrings.Length(stream.outBuf) = 0 THEN
-        Log.Debug(stream.logger, "Copying data to stream buffer");
-        DStrings.Copy(sstr, stream.outBuf);
-        DStrings.Set(stream.outRider, stream.outBuf, 0);
-      END;
-      msgLen := DStrings.Length(stream.outBuf);
-      IF msgLen > 0 THEN
-        Log.Debug(stream.logger, "Sending data over socket");
-        DStrings.ReadBytes(stream.outRider, buf, msgLen);
-        result := artSocket.Send(stream.socket, buf, msgLen, sent);
-        Chars.IntToString(result, logBuf, ok);
-        LogInfoWithData(stream.logger, "Result: ", logBuf);
-        (* If the send was successful or would block, we update the rider and buffer *)
-        IF (result = artSocket.Ok) OR (result = artSocket.WouldBlock) THEN
-          IF sent > 0 THEN
-            (* Consume the sent data and update the rider *)
-            Log.Debug(stream.logger, "Draining sent data from stream buffer");
-            DStrings.Delete(stream.outBuf, 0, sent);
-            DStrings.Set(stream.outRider, stream.outBuf, 0);
-          END;
-          bytesLeft := DStrings.Length(stream.outBuf);
-        END
-      ELSE
-        bytesLeft := 0;
-        result := artSocket.Ok
+    (* If there is no pending data, copy new data into outBuf *)
+    IF DStrings.Length(stream.outBuf) = 0 THEN
+      Log.Debug(stream.logger, "Copying data to stream buffer");
+      DStrings.Copy(sstr, stream.outBuf);
+      DStrings.Set(stream.outRider, stream.outBuf, 0);
+    END;
+
+    msgLen := DStrings.Length(stream.outBuf);
+    IF msgLen > 0 THEN
+      Log.Debug(stream.logger, "Sending data over socket");
+      DStrings.ReadBytes(stream.outRider, buf, msgLen);
+      result := artSocket.Send(stream.socket, buf, msgLen, sent);
+      Chars.IntToString(result, logBuf, ok);
+      LogInfoWithData(stream.logger, "Result: ", logBuf);
+      (* If the send was successful or would block, we update the rider and buffer *)
+      IF (result = artSocket.Ok) OR (result = artSocket.WouldBlock) THEN
+        IF sent > 0 THEN
+          (* Consume the sent data and update the rider *)
+          Log.Debug(stream.logger, "Draining sent data from stream buffer");
+          DStrings.Delete(stream.outBuf, 0, sent);
+          DStrings.Set(stream.outRider, stream.outBuf, 0);
+        END;
+        bytesLeft := DStrings.Length(stream.outBuf);
       END
     ELSE
-      result := artSocket.NotConnected
+      bytesLeft := 0;
+      result := artSocket.Ok
     END
   END;
   RETURN result
@@ -213,7 +216,6 @@ BEGIN
 
   (* Validate args *)
   IF (stream = NIL) OR (dstr = NIL) OR (stream.socket = NIL) THEN
-    Log.Error(stream.logger, "SocketDStream.ReadUntil(): Invalid arguments.");
     done := TRUE
   END;
 
