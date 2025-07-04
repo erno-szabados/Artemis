@@ -15,7 +15,7 @@
 *)
 MODULE SocketDStream;
 
-IMPORT artSocket, DStrings, Log, Chars;
+IMPORT artSocket, DStrings, Log;
 
 CONST 
   (* Maximum buffer size for sending/receiving data *)
@@ -26,19 +26,11 @@ TYPE
   SocketDStreamDesc* = RECORD
     socket: artSocket.Socket;
     logger: Log.Logger;
-    (* Outbuf is the data to be sent, outrider is the associated rider *)
-    (* Inbuf is the data received from the socket, inrider is the associated rider *)
+    (** Input/output buffers *)
     inBuf*, outBuf*: DStrings.String;
+    (** Riders to show where are we at the buffers. *)
     inRider*, outRider*: DStrings.Rider
   END;
-
-PROCEDURE LogInfoWithData(logger: Log.Logger; label: ARRAY OF CHAR; data: ARRAY OF CHAR);
-VAR msg: ARRAY 512 OF CHAR;
-BEGIN
-  Chars.Copy(label, msg);
-  Chars.Append(data, msg);
-  Log.Info(logger, msg)
-END LogInfoWithData;
 
 (** 
   Initializes a new SocketDStream using the given socket.
@@ -76,12 +68,54 @@ END Init;
  *)
 PROCEDURE SendDString*(stream: SocketDStream; sstr: DStrings.String; VAR bytesLeft: INTEGER): INTEGER;
 VAR
-  logBuf: ARRAY 256 OF CHAR; (* For debugging purposes *)
-  buf: ARRAY MaxBufferSize OF BYTE;
   msgLen, sent, result : INTEGER;
-  ok: BOOLEAN;
   done: BOOLEAN;
+
+  (* 
+    Fill the stream output buffer with data from sstr, and reset the rider to the beginning of the buffer.
+    
+    @param sstr - data to fill the buffer.
+    @param stream - stream with the buffer. 
+   *)
+  PROCEDURE FillBuffer(sstr : DStrings.String; VAR stream: SocketDStream);
+  BEGIN
+    Log.Debug(stream.logger, "Copying data to stream buffer");
+    DStrings.Copy(sstr, stream.outBuf);
+    DStrings.Set(stream.outRider, stream.outBuf, 0);
+  END FillBuffer;
+
+  (* 
+    Transmit the buffer contents over the stream socket. May perform a partial transfer if it would block.
+     
+    @param stream - stream descriptor
+    @param msgLen - length of data in buffer
+    @parma sent - number of bytes transmitted
+
+    @return the socket send status result. *)
+  PROCEDURE Transmit(stream : SocketDStream; msgLen : INTEGER; VAR sent: INTEGER) : INTEGER;
+  VAR  
+    buf: ARRAY MaxBufferSize OF BYTE;
+  BEGIN
+    Log.Debug(stream.logger, "Transmit data over socket");
+    DStrings.ReadBytes(stream.outRider, buf, msgLen);
+    RETURN artSocket.Send(stream.socket, buf, msgLen, sent)
+  END Transmit;
+
+  (* 
+    Consume the sent data and update the rider to the start of the remaining data.
+
+    @param stream - stream descriptor.
+    @param sent - number of bytes to remove.
+    *)
+  PROCEDURE DrainBuffer(VAR stream : SocketDStream; sent : INTEGER);
+  BEGIN
+    Log.Debug(stream.logger, "Draining sent data from stream buffer");
+    DStrings.Delete(stream.outBuf, 0, sent);
+    DStrings.Set(stream.outRider, stream.outBuf, 0);
+  END DrainBuffer;
+
 BEGIN
+  (* Initialize *)
   done := FALSE;
   result := artSocket.UnknownError;
   bytesLeft := 0;
@@ -94,29 +128,22 @@ BEGIN
   IF ~done THEN
     (* If there is no pending data, copy new data into outBuf *)
     IF DStrings.Length(stream.outBuf) = 0 THEN
-      Log.Debug(stream.logger, "Copying data to stream buffer");
-      DStrings.Copy(sstr, stream.outBuf);
-      DStrings.Set(stream.outRider, stream.outBuf, 0);
+      FillBuffer(sstr, stream)
     END;
 
     msgLen := DStrings.Length(stream.outBuf);
     IF msgLen > 0 THEN
-      Log.Debug(stream.logger, "Sending data over socket");
-      DStrings.ReadBytes(stream.outRider, buf, msgLen);
-      result := artSocket.Send(stream.socket, buf, msgLen, sent);
-      Chars.IntToString(result, logBuf, ok);
-      LogInfoWithData(stream.logger, "Result: ", logBuf);
+      result := Transmit(stream, msgLen, sent);
+      
       (* If the send was successful or would block, we update the rider and buffer *)
       IF (result = artSocket.Ok) OR (result = artSocket.WouldBlock) THEN
         IF sent > 0 THEN
-          (* Consume the sent data and update the rider *)
-          Log.Debug(stream.logger, "Draining sent data from stream buffer");
-          DStrings.Delete(stream.outBuf, 0, sent);
-          DStrings.Set(stream.outRider, stream.outBuf, 0);
+          DrainBuffer(stream, sent)
         END;
         bytesLeft := DStrings.Length(stream.outBuf);
       END
     ELSE
+      (* No data left to send. *)
       bytesLeft := 0;
       result := artSocket.Ok
     END
