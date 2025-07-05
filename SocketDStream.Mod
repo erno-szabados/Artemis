@@ -61,7 +61,7 @@ BEGIN
   DStrings.Init("", stream.outBuf);
   DStrings.Set(stream.inRider, stream.inBuf, 0);
   DStrings.Set(stream.outRider, stream.outBuf, 0);
-  Log.Debug(stream.logger, "SocketDstream initialized.");
+  Log.Debug(stream.logger, "SocketDstream initialized");
 END Init;
 
 (** 
@@ -169,6 +169,8 @@ END SendDString;
   - the socket is closed  OR
   - any other socket error occurs.
 
+  TODO - add a maxBytes argument to limit the read. -1 no limit, else don't read more than  maxBytes.
+
   Call again if artSocket.WouldBlock is returned, as this indicates a partial read.
   The delimiter (if found) is included in dstr. 
   The caller must check 'found' to determine if the delimiter was found.
@@ -265,7 +267,7 @@ BEGIN
     
     (* Either data from the recent read or we still have unprocessed data in the buffer. *)
     IF FindDelimitedSubString(stream, delimStr, pos) THEN
-        Log.Debug(stream.logger, "Delimiter found.");
+        Log.Debug(stream.logger, "Delimiter found");
         DrainBuffer(stream, pos, dstr);
         (* Clear the input buffer *)
         DStrings.Init("", stream.inBuf);
