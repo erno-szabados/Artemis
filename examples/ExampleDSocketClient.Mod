@@ -22,7 +22,7 @@ VAR
   sock: artSocket.Socket;
   stream: SocketDStream.SocketDStream;
   logger: Log.Logger;
-  recvResult: BOOLEAN;
+  clientFinished, recvResult: BOOLEAN;
   buf: ARRAY BUFSIZE OF CHAR;
 
 PROCEDURE LogErrorWithCode(logger: Log.Logger; msg: ARRAY OF CHAR; code: INTEGER);
@@ -119,7 +119,6 @@ BEGIN
   UNTIL found;
   IF (status = artSocket.Ok) & found THEN
     DStrings.ToChars(dstr, buf, bytesRead);
-    (* buf[bytesRead] := 0X; *)
     LogInfoWithData(logger, "Received: ", buf);
     ok := TRUE
   END;
@@ -134,16 +133,24 @@ BEGIN
 END Cleanup;
 
 BEGIN
+  clientFinished := FALSE;
   InitLogger(logger);
   In.Open;
   IF OpenSocket(sock, logger) THEN
     IF ConnectToServer(sock, logger) THEN
       SocketDStream.Init(sock, stream);
-      In.Line(buf);
-      Chars.Append(Chars.LF, buf);
-      IF SendLine(stream, logger, buf) THEN
-       recvResult := ReceiveResponse(stream, logger, buf)
-      END
+      REPEAT
+        In.Line(buf);
+        IF Chars.Equal("", buf) THEN
+          clientFinished := TRUE
+        ELSE
+          Chars.Append(Chars.LF, buf);
+          IF SendLine(stream, logger, buf) THEN
+            recvResult := ReceiveResponse(stream, logger, buf)
+          END;
+          Chars.Clear(buf)
+        END
+      UNTIL clientFinished
     END;
     Cleanup(sock, logger)
   END
