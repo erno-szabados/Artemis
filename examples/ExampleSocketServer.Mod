@@ -27,7 +27,7 @@ CONST
     logger: Log.Logger;
     dstr: DStrings.String; 
     addr: ARRAY 16 OF CHAR;
-    success, done: BOOLEAN
+    lastResult, done: BOOLEAN
 END;
 
 VAR
@@ -92,7 +92,7 @@ BEGIN
     END
   UNTIL (clientSock # NIL) OR ~success;
 
-  Log.Debug(logger, "Client accept finished.");
+  Log.Debug(logger, "Client accept finished");
   
   RETURN success
   
@@ -167,65 +167,79 @@ BEGIN
 END WriteLine;
 
 BEGIN
-  server.success := TRUE;
+  server.lastResult := TRUE;
   server.done := FALSE;
   server.stream := NIL;
   server.logger := Log.New(Log.INFO, Log.CONSOLE, "");
-  Log.Info(server.logger, "Starting server...");
+  Log.Info(server.logger, "Starting server");
+
+  (* Create and validate socket *)
   server.serverSock := artSocket.NewSocket();
-
-
   IF server.serverSock = NIL THEN
     Log.Error(server.logger, "Failed to create server socket");
-    server.success := FALSE;
+    server.lastResult := FALSE;
     server.done := TRUE
   END;
 
+  (* Bind serfver socket to specified host:port *)
   IF ~server.done THEN
     server.addr := Localhost;
+
     IF artSocket.Bind(server.serverSock, server.addr, Port) # artSocket.Ok THEN
       LogErrorWithCode(server.logger, "Bind failed: ", artSocket.Bind(server.serverSock, server.addr, Port));
       artSocket.Close(server.serverSock);
-      server.success := FALSE;
+      server.lastResult := FALSE;
       server.done := TRUE
     END
   END;
 
+  (* Listen on socket *)
   IF ~server.done THEN
     IF artSocket.Listen(server.serverSock, 1) # artSocket.Ok THEN
       LogErrorWithCode(server.logger, "Listen failed: ", artSocket.Listen(server.serverSock, 1));
       artSocket.Close(server.serverSock);
-      server.success := FALSE;
+      server.lastResult := FALSE;
       server.done := TRUE
     END
   END;
 
   IF ~server.done THEN
     Log.Info(server.logger, "Listening on port 12345");
+    (* Forever *)
     REPEAT
       (* Block until an incoming connection or error *)
       server.done := ~AcceptClient(server.serverSock, server.clientSock, server.logger);
       
+      (* Reinit stream with new client socket *)
       IF ~server.done THEN
         Log.Info(server.logger, "Client connected");
         SocketDStream.Init(server.clientSock, server.stream);
         
+        (* Keep reading *)
         REPEAT
-          server.success := ReadLine(server.stream, server.dstr, server.logger);
-          IF server.success THEN
-            server.done := ~WriteLine(server.stream, server.dstr, server.logger)
-          END
-        UNTIL ~server.success OR server.done;
+          server.lastResult := ReadLine(server.stream, server.dstr, server.logger);
+          IF server.lastResult THEN
+            server.lastResult := WriteLine(server.stream, server.dstr, server.logger)
+          ELSE
+            Log.Error(server.logger, "Readline failed")
+          END;
+        UNTIL ~server.lastResult OR server.done;
+
+        Log.Info(server.logger, "Message processed");
 
         IF server.clientSock # NIL THEN 
           artSocket.Close(server.clientSock);
-          server.clientSock := NIL 
+          server.clientSock := NIL;
+          Log.Info(server.logger, "Client socket closed")
         END;
 
       END
 
     UNTIL FALSE
   END;
+
+
+  (* We will never get here - we don't have a signal handler so Ctrl-c will kill the server. *)
   IF server.serverSock # NIL THEN 
     artSocket.Close(server.serverSock);
     server.serverSock := NIL 

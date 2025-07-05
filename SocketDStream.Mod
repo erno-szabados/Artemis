@@ -256,9 +256,15 @@ BEGIN
   WHILE ~done DO
     (* Keep reading *)
     status := artSocket.Receive(stream.socket, buf, LEN(buf), received);
-    IF (status = artSocket.Ok) & (received > 0) THEN
-      Log.Debug(stream.logger, "Received data from socket, buffering");
-      DStrings.WriteBytes(stream.inRider, buf, received);
+    IF (status = artSocket.Ok) THEN
+      IF (received = 0) THEN
+        Log.Debug(stream.logger, "Client closed the socket.");
+        status := artSocket.Closed;
+        done := TRUE
+      ELSIF (received > 0) THEN 
+        Log.Debug(stream.logger, "Received data from socket, buffering");
+        DStrings.WriteBytes(stream.inRider, buf, received)
+      END
     ELSE
       (* If wouldBlock is returned, there was no data to copy. *)
       (* Socket status (error, wouldBlock or EOF) will be returned. *)
