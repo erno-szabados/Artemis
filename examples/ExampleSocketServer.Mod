@@ -213,7 +213,7 @@ BEGIN
       (* Reinit stream with new client socket *)
       IF ~server.done THEN
         Log.Info(server.logger, "Client connected");
-        SocketDStream.Init(server.clientSock, server.stream);
+        SocketDStream.Init(server.clientSock, server.stream, server.logger);
         
         (* Keep reading *)
         REPEAT

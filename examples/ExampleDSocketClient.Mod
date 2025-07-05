@@ -138,7 +138,7 @@ BEGIN
   In.Open;
   IF OpenSocket(sock, logger) THEN
     IF ConnectToServer(sock, logger) THEN
-      SocketDStream.Init(sock, stream);
+      SocketDStream.Init(sock, stream, logger);
       REPEAT
         In.Line(buf);
         IF Chars.Equal("", buf) THEN

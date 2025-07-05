@@ -5,7 +5,7 @@ Copyright (C) 2025 Artemis Project Contributors
 Released under The 3-Clause BSD License.
 *)
 MODULE SocketDStreamTest;
-IMPORT SocketDStream, artSocket, Tests, DStrings, Chars;
+IMPORT SocketDStream, artSocket, Tests, DStrings, Chars, Log;
 
 VAR
   ts: Tests.TestSet;
@@ -18,7 +18,7 @@ VAR
 BEGIN
   pass := TRUE;
   sock := NIL; (* In real tests, use a mock or real socket *)
-  SocketDStream.Init(sock, stream);
+  SocketDStream.Init(sock, stream, Log.New(Log.DEBUG, Log.CONSOLE, ""));
   Tests.ExpectedBool(TRUE, stream # NIL, "SocketDStream.Init did not allocate stream", pass)
  
   RETURN pass

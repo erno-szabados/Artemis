@@ -47,15 +47,16 @@ TYPE
   Initializes a new SocketDStream using the given socket.
   Initialize and reset the buffers and the associated riders.
 
-  @param socket - an initialized artSocket.
-  @param stream - the socket stream to initialize.
+  @param socket - an initialized artSocket
+  @param stream - the socket stream to initialize
+  @param logger - logger to use
  *)
-PROCEDURE Init*(socket: artSocket.Socket; VAR stream: SocketDStream);
+PROCEDURE Init*(socket: artSocket.Socket; VAR stream: SocketDStream; logger : Log.Logger);
 BEGIN
   IF stream = NIL THEN
     NEW(stream);
   END;
-  stream.logger := Log.New(Log.DEBUG, Log.CONSOLE, "");
+  stream.logger := logger;
   stream.socket := socket;
   DStrings.Init("", stream.inBuf);
   DStrings.Init("", stream.outBuf);
