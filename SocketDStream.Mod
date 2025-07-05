@@ -3,15 +3,26 @@
   Copyright (C) 2025 Artemis Project Contributors
   Released under The 3-Clause BSD License.
 
-  Buffered, sequential socket I/O using DStrings and Riders.
+  Buffered, sequential socket I/O using DStrings and Riders 
+  on top of the nonblocking artSocket implementation.
+
   The API manages partial sends/receives and nonblocking socket state internally.
 
   Usage:
-    IMPORT SDStream := SocketDStream;
+    IMPORT DStrings, SDStream := SocketDStream;
 
     (* Declare and initialize the DStrings.String data *)
-    SDStream.Init(mySocket, myStream);
-    SDStream.WriteDString(myStream, data);
+    VAR 
+      data : DStrings.String;
+      mySocket : artSocket.Socket;
+    
+    BEGIN
+      mySocket := artSocket.NewSocket();
+      (* ... Socket setup ... *)
+      DStrings.Init("Hello, world!", data);
+      SDStream.Init(mySocket, myStream);
+      SDStream.WriteDString(myStream, data);
+      (* ... rest of the code ... *)
 *)
 MODULE SocketDStream;
 
@@ -179,57 +190,50 @@ VAR
   done: BOOLEAN;
 
   (* 
-    Check if delimiter is present in the stream buffer and return its position (if found).
+    Check if delimiter is present in the stream buffer and return the length of content to be extracted (if found).
 
     @param stream - stream descriptor containing the stream buffer.
     @param delimStr - the delimiter we look for.
-    @param pos position of first delimiter character in stream buffer or -1 if not found.
+    @param pos position of first delimiter character in stream buffer or the length of the stream buffer if not found.
 
     @return TRUE if delimiter found in stream buffer, FALSE otherwise.
   *)
-  PROCEDURE HasDelimiterInBuffer(stream: SocketDStream; delimStr: DStrings.String; VAR pos: INTEGER): BOOLEAN;
+  PROCEDURE FindDelimitedSubString(stream: SocketDStream; delimStr: DStrings.String; VAR pos: INTEGER): BOOLEAN;
   VAR
     found: BOOLEAN;
-    bufLen: INTEGER;
+    bufLen, delimLen: INTEGER;
   BEGIN
     pos := -1;
     bufLen := DStrings.Length(stream.inBuf);
-    IF (DStrings.Length(delimStr) > 0) & (bufLen > 0) THEN
+    delimLen := DStrings.Length(delimStr);
+    
+    IF (delimLen > 0) & (bufLen > 0) THEN
       pos := DStrings.Pos(delimStr, stream.inBuf, 0);
     END;
+
     found := (pos # -1);
+    IF found THEN
+      pos := pos + delimLen
+    ELSE
+      (* We can use extract if we set to length of pos *)
+      pos := bufLen
+    END;
     RETURN found
-  END HasDelimiterInBuffer;
+  END FindDelimitedSubString;
 
   (* 
     Copy and delete data up to and including delimiter from the stream buffer into dstr.
     Reset the stream inbuf rider after the data is extracted to the start of the data left in the buffer.
 
     @param stream - stream descriptor containing the input rider and buffer.
-    @param pos - position of delimiter in the stream buffer.
-    @param delimLen - length of the delimiter.
+    @param extractLen - position of delimiter in the stream buffer.
     @param dstr - received data including the delimiter.
   *)
-  PROCEDURE ExtractUpToAndIncluding(stream: SocketDStream; pos, delimLen: INTEGER; VAR dstr: DStrings.String);
-  VAR extractLen: INTEGER;
+  PROCEDURE DrainBuffer(stream: SocketDStream; extractLen: INTEGER; VAR dstr: DStrings.String);
   BEGIN
-    extractLen := pos + delimLen;
     DStrings.Extract(stream.inBuf, 0, extractLen, dstr);
     DStrings.Delete(stream.inBuf, 0, extractLen);
     (* Position the rider to the remaining data for the next read. *)
-    DStrings.Set(stream.inRider, stream.inBuf, 0)
-  END ExtractUpToAndIncluding;
-
-  (* 
-    Drain (copy) the whole stream buffer to dstr, reset the stream buffer and the input rider. 
-    
-    @param stream - stream descriptor
-    @param dstr - target string containing the data from the stream buffer.
-   *)
-  PROCEDURE DrainBuffer(stream: SocketDStream; VAR dstr: DStrings.String);
-  BEGIN
-    DStrings.Copy(stream.inBuf, dstr);
-    DStrings.Init("", stream.inBuf);
     DStrings.Set(stream.inRider, stream.inBuf, 0)
   END DrainBuffer;
 
@@ -260,9 +264,9 @@ BEGIN
     END;
     
     (* Either data from the recent read or we still have unprocessed data in the buffer. *)
-    IF HasDelimiterInBuffer(stream, delimStr, pos) THEN
+    IF FindDelimitedSubString(stream, delimStr, pos) THEN
         Log.Debug(stream.logger, "Delimiter found.");
-        ExtractUpToAndIncluding(stream, pos, LEN(delim), dstr);
+        DrainBuffer(stream, pos, dstr);
         (* Clear the input buffer *)
         DStrings.Init("", stream.inBuf);
         DStrings.Set(stream.inRider, stream.inBuf, 0);
@@ -271,7 +275,7 @@ BEGIN
     ELSIF DStrings.Length(stream.inBuf) > 0 THEN
       (* No delimiter, append the buffered data to dstr, done remains unchanged. *)
       Log.Debug(stream.logger, "No delimiter found, appending data to dstr");
-      DrainBuffer(stream, dstr);
+      DrainBuffer(stream, pos, dstr);
     END
   END
   RETURN status

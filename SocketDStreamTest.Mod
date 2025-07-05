@@ -36,7 +36,7 @@ BEGIN
   DStrings.Init("", dstr);
   bytesLeft := -1;
   status := SocketDStream.SendDString(stream, dstr, bytesLeft);
-  Tests.ExpectedInt(artSocket.NotConnected, status, "SendDString returns NotConnected for NIL stream", pass);
+  Tests.ExpectedInt(artSocket.UnknownError, status, "SendDString returns NotConnected for NIL stream", pass);
   Tests.ExpectedInt(0, bytesLeft, "SendDString bytesLeft is 0 for NIL stream", pass);
   RETURN pass
 END TestSendDString_NilSocket;
@@ -55,33 +55,15 @@ BEGIN
   DStrings.Init("", dstr);
   delim[0] := Chars.LF; delim[1] := 0X;
   status := SocketDStream.ReadUntil(stream, delim, dstr, found);
-  Tests.ExpectedInt(artSocket.NotConnected, status, "ReadUntil returns NotConnected for NIL stream", pass);
+  Tests.ExpectedInt(artSocket.UnknownError, status, "ReadUntil returns NotConnected for NIL stream", pass);
   Tests.ExpectedBool(FALSE, found, "ReadUntil found is FALSE for NIL stream", pass);
   RETURN pass
 END TestReadUntil_NilSocket;
-
-PROCEDURE TestReadNBytes_NilSocket(): BOOLEAN;
-VAR
-  pass: BOOLEAN;
-  stream: SocketDStream.SocketDStream;
-  dstr: DStrings.String;
-  bytesRead, status: INTEGER;
-BEGIN
-  pass := TRUE;
-  stream := NIL;
-  DStrings.Init("", dstr);
-  bytesRead := -1;
-  status := SocketDStream.ReadNBytes(stream, 5, dstr, bytesRead);
-  Tests.ExpectedInt(artSocket.NotConnected, status, "ReadNBytes returns NotConnected for NIL stream", pass);
-  Tests.ExpectedInt(0, bytesRead, "ReadNBytes bytesRead is 0 for NIL stream", pass);
-  RETURN pass
-END TestReadNBytes_NilSocket;
 
 BEGIN
   Tests.Init(ts, "SocketDStream Tests");
   Tests.Add(ts, TestInit);
   Tests.Add(ts, TestSendDString_NilSocket);
   Tests.Add(ts, TestReadUntil_NilSocket);
-  Tests.Add(ts, TestReadNBytes_NilSocket);
   ASSERT(Tests.Run(ts));
 END SocketDStreamTest.

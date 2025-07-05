@@ -20,10 +20,9 @@ CONST
 VAR
   serverSock, clientSock: artSocket.Socket;
   stream: SocketDStream.SocketDStream;
-  dstr: DStrings.String;
-  rider : DStrings.Rider;
-  addr: ARRAY 16 OF CHAR;
   logger: Log.Logger;
+  dstr: DStrings.String;
+  addr: ARRAY 16 OF CHAR;
   closed, done: BOOLEAN;
 
 PROCEDURE LogErrorWithCode(logger: Log.Logger; msg: ARRAY OF CHAR; code: INTEGER);
@@ -109,11 +108,14 @@ BEGIN
 END WriteLine;
 
 BEGIN
+  closed := TRUE;
   done := FALSE;
+  stream := NIL;
   logger := Log.New(Log.INFO, Log.CONSOLE, "");
   Log.Info(logger, "Starting server...");
-
   serverSock := artSocket.NewSocket();
+
+
   IF serverSock = NIL THEN
     Log.Error(logger, "Failed to create server socket");
     Log.Close(logger);
@@ -149,16 +151,20 @@ BEGIN
         closed := FALSE;
         REPEAT
           IF ReadLine(stream, dstr, logger, closed) THEN
-            DStrings.Set(rider, dstr, DStrings.Length(dstr));
-            DStrings.WriteChar(rider, Chars.LF);
             WriteLine(stream, dstr, logger, done)
           END
         UNTIL closed OR done;
-        IF clientSock # NIL THEN artSocket.Close(clientSock) END;
+        IF clientSock # NIL THEN 
+          artSocket.Close(clientSock);
+          clientSock := NIL 
+        END;
       END
     UNTIL FALSE
   END;
-  IF serverSock # NIL THEN artSocket.Close(serverSock) END;
+  IF serverSock # NIL THEN 
+    artSocket.Close(serverSock);
+    serverSock := NIL 
+  END;
   Log.Info(logger, "Server shutdown");
   Log.Close(logger);
 END ExampleSocketServer.
