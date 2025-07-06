@@ -171,7 +171,6 @@ END SendDString;
   - the socket is closed  OR
   - any other socket error occurs.
 
-
   Call again if artSocket.WouldBlock is returned, as this indicates a partial read.
   The delimiter (if found) is included in dstr. 
   The caller must check 'found' to determine if the delimiter was found.
@@ -198,7 +197,7 @@ VAR
     Check if delimiter is present in the stream buffer and return the length of content to be extracted (if found).
 
     @param stream - stream descriptor containing the stream buffer.
-    @param delimStr - the delimiter we look for.
+    @param delimStr - the delimiter we look for. Must be at least 1 characters.
     @param pos position of first delimiter character in stream buffer or the length of the stream buffer if not found.
 
     @return TRUE if delimiter found in stream buffer, FALSE otherwise.
@@ -252,7 +251,7 @@ BEGIN
   DStrings.Init(delim, delimStr);
 
   (* Validate args *)
-  IF (stream = NIL) OR (dstr = NIL) OR (stream.socket = NIL) THEN
+  IF (stream = NIL) OR (dstr = NIL) OR (stream.socket = NIL) OR (LEN(delim) = 0) THEN
     done := TRUE
   END;
 

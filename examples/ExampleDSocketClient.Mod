@@ -83,7 +83,7 @@ VAR dstr: DStrings.String; bytesLeft, status: INTEGER; ok: BOOLEAN;
 BEGIN
   DStrings.Init("", dstr);
   DStrings.CopyChars(buf, dstr);
-  LogInfoWithData(logger, "Sending: ", buf);
+  Log.Debug(logger, "Sending");
   REPEAT
     status := SocketDStream.SendDString(stream, dstr, bytesLeft);
     IF (status = artSocket.WouldBlock) THEN
@@ -95,7 +95,7 @@ BEGIN
     END
   UNTIL (bytesLeft = 0) OR (status # artSocket.Ok);
   IF status = artSocket.Ok THEN
-    LogInfoWithData(logger, "Sent: ", buf);
+    Log.Debug(logger, "Sent OK");
     ok := TRUE
   END;
   RETURN ok
