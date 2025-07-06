@@ -17,6 +17,7 @@ CONST
   SERVER_ADDR = "127.0.0.1";
   PORT = 12345;
   BUFSIZE = 256;
+  MaxBytesRead = 512;
 
 VAR
   sock: artSocket.Socket;
@@ -109,14 +110,14 @@ BEGIN
   found := FALSE;
   ok := TRUE;
   REPEAT
-    status := SocketDStream.ReadUntil(stream, delim, dstr, found);
+    status := SocketDStream.ReadUntil(stream, delim, MaxBytesRead, dstr, found);
     IF (status = artSocket.WouldBlock) THEN
       artSleep.Millis(100)
     ELSIF status # artSocket.Ok THEN
       LogErrorWithCode(logger, "Receive failed: ", status);
       ok := FALSE
     END
-  UNTIL found;
+  UNTIL found OR ~ok;
   IF (status = artSocket.Ok) & found THEN
     DStrings.ToChars(dstr, buf, bytesRead);
     LogInfoWithData(logger, "Received: ", buf);
@@ -150,7 +151,7 @@ BEGIN
           END;
           Chars.Clear(buf)
         END
-      UNTIL clientFinished
+      UNTIL clientFinished OR recvResult = FALSE
     END;
     Cleanup(sock, logger)
   END

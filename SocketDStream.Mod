@@ -166,11 +166,11 @@ END SendDString;
 (**
   Reads data from the nonblocking socket in a nonblocking way until 
   - the specified delimiter is found OR
+  - read maxBytes bytes OR
   - the socket would block OR
   - the socket is closed  OR
   - any other socket error occurs.
 
-  TODO - add a maxBytes argument to limit the read. -1 no limit, else don't read more than  maxBytes.
 
   Call again if artSocket.WouldBlock is returned, as this indicates a partial read.
   The delimiter (if found) is included in dstr. 
@@ -180,17 +180,19 @@ END SendDString;
   
   @param stream - initialized stream descriptor
   @param delim - the delimiter to terminate the read
+  @param maxBytes If -1 no limit to read, else don't read more than maxBytes.
   @param dstr - the data read, including the delimiter
   @param found - TRUE if delimiter was found, FALSE otherwise.
 
   @return the status of the socket read. 
 *)
-PROCEDURE ReadUntil*(stream: SocketDStream; delim: ARRAY OF CHAR; VAR dstr: DStrings.String; VAR found: BOOLEAN): INTEGER;
+PROCEDURE ReadUntil*(stream: SocketDStream; delim: ARRAY OF CHAR; maxBytes : INTEGER; VAR dstr: DStrings.String; VAR found: BOOLEAN): INTEGER;
 VAR
   status, pos, received: INTEGER;
   delimStr: DStrings.String;
   buf: ARRAY MaxBufferSize OF BYTE;
   done: BOOLEAN;
+  bytesRead : INTEGER;
 
   (* 
     Check if delimiter is present in the stream buffer and return the length of content to be extracted (if found).
@@ -245,6 +247,7 @@ BEGIN
   found := FALSE;
   done := FALSE;
   status := artSocket.UnknownError;
+  bytesRead := 0;
   DStrings.Init("", dstr);
   DStrings.Init(delim, delimStr);
 
@@ -264,6 +267,13 @@ BEGIN
         done := TRUE
       ELSIF (received > 0) THEN 
         Log.Debug(stream.logger, "Received data from socket, buffering");
+        IF (maxBytes # -1) & (bytesRead + received > maxBytes) THEN
+          (* Do not buffer if we would exceed MaxBytes. *)
+          received := maxBytes - bytesRead;
+          (* Must abort as we read the allowed amount. *)
+          done := TRUE
+        END;
+        bytesRead := bytesRead + received;
         DStrings.WriteBytes(stream.inRider, buf, received)
       END
     ELSE

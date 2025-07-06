@@ -54,7 +54,7 @@ BEGIN
   stream := NIL;
   DStrings.Init("", dstr);
   delim[0] := Chars.LF; delim[1] := 0X;
-  status := SocketDStream.ReadUntil(stream, delim, dstr, found);
+  status := SocketDStream.ReadUntil(stream, delim, -1, dstr, found);
   Tests.ExpectedInt(artSocket.UnknownError, status, "ReadUntil returns NotConnected for NIL stream", pass);
   Tests.ExpectedBool(FALSE, found, "ReadUntil found is FALSE for NIL stream", pass);
   RETURN pass

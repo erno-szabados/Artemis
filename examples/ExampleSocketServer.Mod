@@ -19,6 +19,8 @@ CONST
   BufSize = 256;
   SocketIntervalMs = 100;
   Localhost = "127.0.0.1";
+  (* Longer messages will be truncated *)
+  MaxBytesRead = 16; 
 
   TYPE
   ServerDesc = RECORD 
@@ -108,7 +110,7 @@ END AcceptClient;
   @returns TRUE on successful read, FALSE on error.
  *)
 PROCEDURE ReadLine(stream: SocketDStream.SocketDStream; VAR dstr: DStrings.String; logger: Log.Logger): BOOLEAN;
-VAR status: INTEGER; delimFound, socketError, ok: BOOLEAN;
+VAR status: INTEGER; delimFound, socketError, ok: BOOLEAN; rider : DStrings.Rider;
 BEGIN
   DStrings.Init("", dstr);
   ok := FALSE;
@@ -116,11 +118,17 @@ BEGIN
 
   REPEAT
     (* Read until LF or socket error *)
-    status := SocketDStream.ReadUntil(stream, Chars.LF, dstr, delimFound);
+    status := SocketDStream.ReadUntil(stream, Chars.LF, MaxBytesRead, dstr, delimFound);
 
     IF status = artSocket.Ok THEN
       IF delimFound THEN
         LogInfoWithData(logger, "Received: ", dstr);
+        ok := TRUE
+      ELSE
+        Log.Warning(logger, "Delimiter not found until read limit");
+        DStrings.Set(rider, dstr, DStrings.Length(dstr) - 1);
+        DStrings.WriteChar(rider, Chars.LF);
+        delimFound := TRUE;
         ok := TRUE
       END
     ELSIF status = artSocket.WouldBlock THEN
@@ -181,7 +189,7 @@ BEGIN
     server.done := TRUE
   END;
 
-  (* Bind serfver socket to specified host:port *)
+  (* Bind server socket to specified host:port *)
   IF ~server.done THEN
     server.addr := Localhost;
 
