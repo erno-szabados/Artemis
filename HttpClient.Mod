@@ -18,6 +18,15 @@ CONST
 
   MaxHostLen = 1024;
 
+  (* Error codes for HttpClient.error *)
+  ErrNone = 0;
+  ErrUrlParse = 1;
+  ErrRequestSerialization = 2;
+  ErrSocketCreate = 3;
+  ErrConnect = 4;
+  ErrRequestInit = 5;
+  ErrHostTruncate = 6;
+
 TYPE
   HttpClient* = POINTER TO HttpClientDesc;
   HttpClientDesc* = RECORD
@@ -69,81 +78,135 @@ BEGIN
   RETURN result
 END GetError;
 
+(* Resets the client state and fields to defaults. *)
+PROCEDURE ResetClient(VAR client: HttpClient);
+BEGIN
+  client.state := Idle;
+  client.error := ErrNone;
+  client.req := NIL;
+  client.resp := NIL;
+  client.url := NIL;
+  client.socket := NIL;
+  client.stream := NIL
+END ResetClient;
+
+(* Parses the URL and sets client.url. Returns TRUE on success, sets error otherwise. *)
+PROCEDURE ParseAndSetUrl(client: HttpClient; url: ARRAY OF CHAR): BOOLEAN;
+VAR ok, result: BOOLEAN;
+BEGIN
+  ok := HttpUrl.Parse(url, client.url);
+  IF ~ok THEN
+    client.state := Error;
+    client.error := ErrUrlParse;
+    result := FALSE
+  ELSE
+    result := TRUE
+  END;
+  RETURN result
+END ParseAndSetUrl;
+
+(* Initializes the request and sets headers/body. Returns TRUE on success, sets error otherwise. *)
+PROCEDURE InitRequest(client: HttpClient; method: ARRAY OF CHAR; headers, body: DStrings.String): BOOLEAN;
+VAR ok, result: BOOLEAN;
+BEGIN
+  HttpRequest.InitDString(method, client.url.path, client.req);
+  IF client.req = NIL THEN
+    client.state := Error;
+    client.error := ErrRequestInit;
+    result := FALSE
+  ELSE
+    IF headers # NIL THEN
+      (* TODO: Copy headers from provided DStrings.String to request *)
+    END;
+    IF body # NIL THEN
+      ok := HttpRequest.SetBodyDString(client.req, body);
+      IF ~ok THEN
+        client.state := Error;
+        client.error := ErrRequestSerialization;
+        result := FALSE
+      ELSE
+        result := TRUE
+      END
+    ELSE
+      result := TRUE
+    END
+  END;
+  RETURN result
+END InitRequest;
+
+(* Serializes the request to reqStr. Returns TRUE on success, sets error otherwise. *)
+PROCEDURE SerializeRequest(client: HttpClient; VAR reqStr: DStrings.String): BOOLEAN;
+VAR ok, result: BOOLEAN;
+BEGIN
+  ok := HttpRequest.ToString(client.req, reqStr);
+  IF ~ok THEN
+    client.state := Error;
+    client.error := ErrRequestSerialization;
+    result := FALSE
+  ELSE
+    result := TRUE
+  END;
+  RETURN result
+END SerializeRequest;
+
+(* Creates and connects the socket, initializes stream. Returns TRUE on success, sets error otherwise. *)
+PROCEDURE ConnectSocketAndStream(client: HttpClient; host: DStrings.String; port: INTEGER): BOOLEAN;
+VAR
+  hostBuf: ARRAY MaxHostLen OF CHAR;
+  truncated, status: INTEGER;
+  logger: Log.Logger;
+  result: BOOLEAN;
+BEGIN
+  client.socket := artSocket.NewSocket();
+  IF client.socket = NIL THEN
+    client.state := Error;
+    client.error := ErrSocketCreate;
+    result := FALSE
+  ELSE
+    DStrings.ToChars(host, hostBuf, truncated);
+    IF truncated # 0 THEN
+      client.state := Error;
+      client.error := ErrHostTruncate;
+      result := FALSE
+    ELSE
+      status := artSocket.Connect(client.socket, hostBuf, port);
+      IF (status # artSocket.Ok) & (status # artSocket.InProgress) THEN
+        client.state := Error;
+        client.error := ErrConnect;
+        result := FALSE
+      ELSE
+        logger := NIL; (* Optionally set a logger *)
+        SocketDStream.Init(client.socket, client.stream, logger);
+        result := TRUE
+      END
+    END
+  END;
+  RETURN result
+END ConnectSocketAndStream;
+
 (** Starts a new HTTP request. *)
 PROCEDURE StartRequest*(client: HttpClient; method, url: ARRAY OF CHAR; headers, body: DStrings.String);
 VAR
-  ok: BOOLEAN;
-  status: INTEGER;
-  logger: Log.Logger;
   reqStr: DStrings.String;
-  hostBuf : ARRAY MaxHostLen OF CHAR;
-  truncated : INTEGER;
+  ok: BOOLEAN;
 BEGIN
   IF client # NIL THEN
-    (* Reset state *)
-    client.state := Idle;
-    client.error := 0;
-    client.req := NIL;
-    client.resp := NIL;
-    client.url := NIL;
-    client.socket := NIL;
-    client.stream := NIL;
-
-    (* Parse URL *)
-    ok := HttpUrl.Parse(url, client.url);
-    IF ~ok THEN
-      client.state := Error;
-      client.error := 1; (* URL parse error *)
-    ELSE
-      (* Build request *)
-      HttpRequest.InitDString(method, client.url.path, client.req);
-      IF client.req # NIL THEN
-        (* Set headers and body if provided *)
-        IF headers # NIL THEN
-          (* TODO: Copy headers from provided DStrings.String to request *)
-        END;
-        IF body # NIL THEN
-          ok := HttpRequest.SetBodyDString(client.req, body);
-        END;
-        (* Serialize request to string *)
-        ok := HttpRequest.ToString(client.req, reqStr);
-        IF ~ok THEN
-          client.state := Error;
-          client.error := 2; (* Request serialization error *)
-        ELSE
-          (* Create socket *)
-          client.socket := artSocket.NewSocket();
-          IF client.socket = NIL THEN
-            client.state := Error;
-            client.error := 3; (* Socket creation error *)
-          ELSE
-            (* Connect socket *)
-            DStrings.ToChars(client.url.host, hostBuf, truncated);
-            IF truncated = 0 THEN
-              status := artSocket.Connect(client.socket, hostBuf, client.url.port);
-              IF (status # artSocket.Ok) & (status # artSocket.InProgress) THEN
-                client.state := Error;
-                client.error := 4; (* Connect error *)
-              ELSE
-                (* Initialize SocketDStream *)
-                logger := NIL; (* Optionally set a logger *)
-                SocketDStream.Init(client.socket, client.stream, logger);
-                client.state := Connecting;
-                (* Save serialized request for sending in Step *)
-                (* TODO: Store reqStr in client for sending in Step *)
-              END;
-            ELSE
-              client.error := 5;
-              client.state := Error;
-            END
-          END;
-        END;
-      ELSE
-        client.state := Error;
-        client.error := 5; (* Request init error *)
-      END;
-    END;
-  END;
+    ResetClient(client);
+    ok := ParseAndSetUrl(client, url);
+    IF ok THEN
+      ok := InitRequest(client, method, headers, body);
+      IF ok THEN
+        ok := SerializeRequest(client, reqStr);
+        IF ok THEN
+          ok := ConnectSocketAndStream(client, client.url.host, client.url.port);
+          IF ok THEN
+            client.state := Connecting;
+            (* TODO: Store reqStr in client for sending in Step *)
+          END
+        END
+      END
+    END
+  END
 END StartRequest;
 
 (** Advances the state machine by one step. Returns TRUE if more work is needed, FALSE if done or error. *)
