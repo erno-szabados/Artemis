@@ -6,7 +6,7 @@ Released under The 3-Clause BSD License.
 *)
 MODULE HttpClient;
 
-IMPORT DStrings, HttpRequest, HttpResponse, HttpUrl, artSocket, SocketDStream, Log;
+IMPORT DStrings, HttpRequest, HttpHeader, Collections, Dictionary, HttpResponse, HttpUrl, artSocket, SocketDStream, Log;
 
 CONST
   Idle = 0;
@@ -41,6 +41,10 @@ TYPE
     reqBytesLeft: INTEGER;   (* Bytes left to send *)
     recvBuf: DStrings.String; (* Buffer for receiving response *)
     recvDone: BOOLEAN        (* TRUE if response fully received *)
+  END;
+
+  CopyHeaderState = RECORD (Dictionary.DictVisitorState)
+    dest: HttpHeader.Header
   END;
 
 (** Initializes a new HttpClient instance. *)
@@ -109,9 +113,22 @@ BEGIN
   RETURN result
 END ParseAndSetUrl;
 
+(* Visitor to copy each header field from headers to dest header *)
+PROCEDURE CopyHeaderField(key: ARRAY OF CHAR; value: Collections.ItemPtr; VAR state: Collections.VisitorState): BOOLEAN;
+VAR kstr, val: DStrings.String; ok : BOOLEAN;
+BEGIN
+  IF value IS DStrings.String THEN
+    val := value(DStrings.String);
+    DStrings.Init(key, kstr);
+    ok := HttpHeader.SetDString(state(CopyHeaderState).dest, kstr, val)
+  END;
+  RETURN TRUE
+END CopyHeaderField;
+
 (* Initializes the request and sets headers/body. Returns TRUE on success, sets error otherwise. *)
-PROCEDURE InitRequest(client: HttpClient; method: ARRAY OF CHAR; headers, body: DStrings.String): BOOLEAN;
-VAR ok, result: BOOLEAN;
+PROCEDURE InitRequest(client: HttpClient; method: ARRAY OF CHAR; headers: HttpHeader.Header; body: DStrings.String): BOOLEAN;
+  VAR ok, result: BOOLEAN; copyState: CopyHeaderState;
+  
 BEGIN
   HttpRequest.InitDString(method, client.url.path, client.req);
   IF client.req = NIL THEN
@@ -120,7 +137,8 @@ BEGIN
     result := FALSE
   ELSE
     IF headers # NIL THEN
-      (* TODO: Copy headers from provided DStrings.String to request *)
+      copyState.dest := client.req.headers;
+      HttpHeader.Foreach(headers, CopyHeaderField, copyState)
     END;
     IF body # NIL THEN
       ok := HttpRequest.SetBodyDString(client.req, body);
@@ -189,7 +207,7 @@ BEGIN
 END ConnectSocketAndStream;
 
 (** Starts a new HTTP request. *)
-PROCEDURE StartRequest*(client: HttpClient; method, url: ARRAY OF CHAR; headers, body: DStrings.String);
+PROCEDURE StartRequest*(client: HttpClient; method, url: ARRAY OF CHAR; headers: HttpHeader.Header; body: DStrings.String);
 VAR
   reqStr: DStrings.String;
   ok, done: BOOLEAN;

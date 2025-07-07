@@ -108,7 +108,7 @@ END Get;
 (*
   Internal: Sets or updates a header field using DStrings.String parameters (case-insensitive). Returns TRUE on success.
 *)
-PROCEDURE SetDString(h: Header; key, value: DStrings.String): BOOLEAN;
+PROCEDURE SetDString*(h: Header; key, value: DStrings.String): BOOLEAN;
 VAR
   result: BOOLEAN;
   normKey: DStrings.String;
