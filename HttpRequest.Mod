@@ -18,6 +18,7 @@ TYPE
     body*:   DStrings.String      (* request body, may be empty *)
   END;
 
+
 (** Initializes a new HTTP request with the given method and url/path. *)
 PROCEDURE Init*(method, url: ARRAY OF CHAR; VAR req: HttpRequest);
 VAR result: HttpRequest;
@@ -29,6 +30,18 @@ BEGIN
   DStrings.Init("", result.body);
   req := result
 END Init;
+
+(** Initializes a new HTTP request with the given method and url/path. *)
+PROCEDURE InitDString*(method: ARRAY OF CHAR; url: DStrings.String; VAR req: HttpRequest);
+VAR result: HttpRequest;
+BEGIN
+  NEW(result);
+  DStrings.Init(method, result.method);
+  DStrings.Copy(url, result.url);
+  HttpHeader.Init(result.headers);
+  DStrings.Init("", result.body);
+  req := result
+END InitDString;
 
 (** Sets a header field (case-insensitive). Accepts ARRAY OF CHAR for ergonomics. *)
 PROCEDURE SetHeader*(req: HttpRequest; key, value: ARRAY OF CHAR): BOOLEAN;

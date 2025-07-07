@@ -6,7 +6,7 @@ Released under The 3-Clause BSD License.
 *)
 MODULE HttpClient;
 
-IMPORT DStrings, HttpRequest, HttpResponse, HttpUrl, artSocket;
+IMPORT DStrings, HttpRequest, HttpResponse, HttpUrl, artSocket, SocketDStream, Log;
 
 CONST
   Idle = 0;
@@ -16,18 +16,17 @@ CONST
   Done = 4;
   Error = 5;
 
+  MaxHostLen = 1024;
+
 TYPE
   HttpClient* = POINTER TO HttpClientDesc;
   HttpClientDesc* = RECORD
     state: INTEGER;
     socket: artSocket.Socket;
+    stream: SocketDStream.SocketDStream; (* Buffered socket stream *)
     req: HttpRequest.HttpRequest;
     resp: HttpResponse.HttpResponse;
     url: HttpUrl.Url;
-    outBuf: DStrings.String;
-    inBuf: DStrings.String;
-    outPos: INTEGER;
-    inPos: INTEGER;
     error: INTEGER
   END;
 
@@ -39,13 +38,10 @@ BEGIN
   END;
   client.state := Idle;
   client.socket := NIL;
+  client.stream := NIL;
   client.req := NIL;
   client.resp := NIL;
   client.url := NIL;
-  DStrings.Init("", client.outBuf);
-  DStrings.Init("", client.inBuf);
-  client.outPos := 0;
-  client.inPos := 0;
   client.error := 0
 END Init;
 
@@ -75,10 +71,78 @@ END GetError;
 
 (** Starts a new HTTP request. *)
 PROCEDURE StartRequest*(client: HttpClient; method, url: ARRAY OF CHAR; headers, body: DStrings.String);
+VAR
+  ok: BOOLEAN;
+  status: INTEGER;
+  logger: Log.Logger;
+  reqStr: DStrings.String;
+  hostBuf : ARRAY MaxHostLen OF CHAR;
+  truncated : INTEGER;
 BEGIN
   IF client # NIL THEN
-    (* Parse URL, build request, set up buffers, move to Connecting state *)
-    (* Implementation to be filled in *)
+    (* Reset state *)
+    client.state := Idle;
+    client.error := 0;
+    client.req := NIL;
+    client.resp := NIL;
+    client.url := NIL;
+    client.socket := NIL;
+    client.stream := NIL;
+
+    (* Parse URL *)
+    ok := HttpUrl.Parse(url, client.url);
+    IF ~ok THEN
+      client.state := Error;
+      client.error := 1; (* URL parse error *)
+    ELSE
+      (* Build request *)
+      HttpRequest.InitDString(method, client.url.path, client.req);
+      IF client.req # NIL THEN
+        (* Set headers and body if provided *)
+        IF headers # NIL THEN
+          (* TODO: Copy headers from provided DStrings.String to request *)
+        END;
+        IF body # NIL THEN
+          ok := HttpRequest.SetBodyDString(client.req, body);
+        END;
+        (* Serialize request to string *)
+        ok := HttpRequest.ToString(client.req, reqStr);
+        IF ~ok THEN
+          client.state := Error;
+          client.error := 2; (* Request serialization error *)
+        ELSE
+          (* Create socket *)
+          client.socket := artSocket.NewSocket();
+          IF client.socket = NIL THEN
+            client.state := Error;
+            client.error := 3; (* Socket creation error *)
+          ELSE
+            (* Connect socket *)
+            DStrings.ToChars(client.url.host, hostBuf, truncated);
+            IF truncated = 0 THEN
+              status := artSocket.Connect(client.socket, hostBuf, client.url.port);
+              IF (status # artSocket.Ok) & (status # artSocket.InProgress) THEN
+                client.state := Error;
+                client.error := 4; (* Connect error *)
+              ELSE
+                (* Initialize SocketDStream *)
+                logger := NIL; (* Optionally set a logger *)
+                SocketDStream.Init(client.socket, client.stream, logger);
+                client.state := Connecting;
+                (* Save serialized request for sending in Step *)
+                (* TODO: Store reqStr in client for sending in Step *)
+              END;
+            ELSE
+              client.error := 5;
+              client.state := Error;
+            END
+          END;
+        END;
+      ELSE
+        client.state := Error;
+        client.error := 5; (* Request init error *)
+      END;
+    END;
   END;
 END StartRequest;
 
@@ -154,30 +218,6 @@ BEGIN
   END;
   RETURN result
 END GetUrl;
-
-(** Gets the outPos. *)
-PROCEDURE GetOutPos*(client: HttpClient): INTEGER;
-VAR result: INTEGER;
-BEGIN
-  IF client # NIL THEN
-    result := client.outPos
-  ELSE
-    result := 0
-  END;
-  RETURN result
-END GetOutPos;
-
-(** Gets the inPos. *)
-PROCEDURE GetInPos*(client: HttpClient): INTEGER;
-VAR result: INTEGER;
-BEGIN
-  IF client # NIL THEN
-    result := client.inPos
-  ELSE
-    result := 0
-  END;
-  RETURN result
-END GetInPos;
 
 (** Gets the parsed response if available. Returns TRUE if successful. *)
 PROCEDURE GetResponse*(client: HttpClient; VAR resp: HttpResponse.HttpResponse): BOOLEAN;
