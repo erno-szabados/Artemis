@@ -188,23 +188,28 @@ END ConnectSocketAndStream;
 PROCEDURE StartRequest*(client: HttpClient; method, url: ARRAY OF CHAR; headers, body: DStrings.String);
 VAR
   reqStr: DStrings.String;
-  ok: BOOLEAN;
+  ok, done: BOOLEAN;
 BEGIN
+  done := FALSE;
   IF client # NIL THEN
     ResetClient(client);
     ok := ParseAndSetUrl(client, url);
-    IF ok THEN
+    IF ~ok THEN done := TRUE END;
+    IF ~done THEN
       ok := InitRequest(client, method, headers, body);
-      IF ok THEN
-        ok := SerializeRequest(client, reqStr);
-        IF ok THEN
-          ok := ConnectSocketAndStream(client, client.url.host, client.url.port);
-          IF ok THEN
-            client.state := Connecting;
-            (* TODO: Store reqStr in client for sending in Step *)
-          END
-        END
-      END
+      IF ~ok THEN done := TRUE END
+    END;
+    IF ~done THEN
+      ok := SerializeRequest(client, reqStr);
+      IF ~ok THEN done := TRUE END
+    END;
+    IF ~done THEN
+      ok := ConnectSocketAndStream(client, client.url.host, client.url.port);
+      IF ~ok THEN done := TRUE END
+    END;
+    IF ~done THEN
+      client.state := Connecting;
+      (* TODO: Store reqStr in client for sending in Step *)
     END
   END
 END StartRequest;
