@@ -1,29 +1,30 @@
-(** ExampleSocketClient.Mod - Minimal nonblocking TCP client example
+(** ExampleDSocketClient.Mod - Minimal nonblocking TCP client using SocketDStream
 
 Copyright (C) 2025 Artemis Project
 
 Released under The 3-Clause BSD License.
 See https://opensource.org/licenses/BSD-3-Clause
 
-This example demonstrates a minimal TCP client using the artSocket module.
+This example demonstrates a minimal TCP client using the SocketDStream module.
 It connects to the ExampleSocketServer, sends a line of text, receives the capitalized response,
-and logs all steps using the Log module.
+and logs all steps using the Log module. All I/O is performed using DStrings and SocketDStream.
 *)
 MODULE ExampleSocketClient;
 
-IMPORT artSocket, Chars, Log, In;
+IMPORT artSocket, artSleep, SocketDStream, DStrings, Chars, Log, In;
 
 CONST
   SERVER_ADDR = "127.0.0.1";
   PORT = 12345;
   BUFSIZE = 256;
+  MaxBytesRead = 512;
 
 VAR
   sock: artSocket.Socket;
-  buf: ARRAY BUFSIZE OF CHAR;
-  n, err: INTEGER;
+  stream: SocketDStream.SocketDStream;
   logger: Log.Logger;
-  done: BOOLEAN;
+  clientFinished, recvResult: BOOLEAN;
+  buf: ARRAY BUFSIZE OF CHAR;
 
 PROCEDURE LogErrorWithCode(logger: Log.Logger; msg: ARRAY OF CHAR; code: INTEGER);
 VAR fullMsg, numStr: ARRAY 64 OF CHAR; ok: BOOLEAN;
@@ -42,67 +43,116 @@ BEGIN
   Log.Info(logger, msg)
 END LogInfoWithData;
 
+PROCEDURE InitLogger(VAR logger: Log.Logger);
 BEGIN
-  done := FALSE;
   logger := Log.New(Log.INFO, Log.CONSOLE, "");
-  Log.Info(logger, "Starting client");
+  Log.Info(logger, "Starting DSocket client")
+END InitLogger;
 
-  (* Initialize input from stdin *)
-  In.Open;
-
+PROCEDURE OpenSocket(VAR sock: artSocket.Socket; logger: Log.Logger): BOOLEAN;
+VAR ok: BOOLEAN;
+BEGIN
   sock := artSocket.NewSocket();
   IF sock = NIL THEN
     Log.Error(logger, "Failed to create socket");
     Log.Close(logger);
-    done := TRUE
+    ok := FALSE
+  ELSE
+    ok := TRUE
   END;
+  RETURN ok
+END OpenSocket;
 
-  IF ~done THEN
-    err := artSocket.Connect(sock, SERVER_ADDR, PORT);
-    IF (err # artSocket.Ok) & (err # artSocket.InProgress) THEN
-      LogErrorWithCode(logger, "Connect failed: ", err);
-      artSocket.Close(sock);
-      Log.Close(logger);
-      done := TRUE
+PROCEDURE ConnectToServer(sock: artSocket.Socket; logger: Log.Logger): BOOLEAN;
+VAR status: INTEGER; ok: BOOLEAN;
+BEGIN
+  status := artSocket.Connect(sock, SERVER_ADDR, PORT);
+  IF (status # artSocket.Ok) & (status # artSocket.InProgress) THEN
+    LogErrorWithCode(logger, "Connect failed: ", status);
+    artSocket.Close(sock);
+    Log.Close(logger);
+    ok := FALSE
+  ELSE
+    ok := TRUE
+  END;
+  RETURN ok
+END ConnectToServer;
+
+PROCEDURE SendLine(stream: SocketDStream.SocketDStream; logger: Log.Logger; buf: ARRAY OF CHAR): BOOLEAN;
+VAR dstr: DStrings.String; bytesLeft, status: INTEGER; ok: BOOLEAN;
+BEGIN
+  DStrings.Init("", dstr);
+  DStrings.CopyChars(buf, dstr);
+  Log.Debug(logger, "Sending");
+  REPEAT
+    status := SocketDStream.SendDString(stream, dstr, bytesLeft);
+    IF (status = artSocket.WouldBlock) THEN
+      artSleep.Millis(1000);
+      Log.Info(logger, "Still waiting to send...")
+    ELSIF status # artSocket.Ok THEN
+      LogErrorWithCode(logger, "Send failed: ", status);
+      ok := FALSE
     END
+  UNTIL (bytesLeft = 0) OR (status # artSocket.Ok);
+  IF status = artSocket.Ok THEN
+    Log.Debug(logger, "Sent OK");
+    ok := TRUE
   END;
+  RETURN ok
+END SendLine;
 
-  IF ~done THEN
-    (* Read a line from standard input *)
-    In.Line(buf);
-    LogInfoWithData(logger, "Sending: ", buf);
-    n := 0;
-    err := artSocket.Send(sock, buf, Chars.Length(buf), n);
-    IF n > 0 THEN
-      LogInfoWithData(logger, "Sent: ", "OK")
-    ELSIF err = artSocket.WouldBlock THEN
-      (* Optionally yield or retry here *)
-    ELSE
-      LogErrorWithCode(logger, "Send failed: ", err);
-      done := TRUE
+PROCEDURE ReceiveResponse(stream: SocketDStream.SocketDStream; logger: Log.Logger; VAR buf: ARRAY OF CHAR): BOOLEAN;
+VAR dstr: DStrings.String; bytesRead, status: INTEGER; ok, found: BOOLEAN;
+  delim: ARRAY 1 OF CHAR;
+BEGIN
+  DStrings.Init("", dstr);
+  delim[0] := Chars.LF; (* Use LF as delimiter *)
+  found := FALSE;
+  ok := TRUE;
+  REPEAT
+    status := SocketDStream.ReadUntil(stream, delim, MaxBytesRead, dstr, found);
+    IF (status = artSocket.WouldBlock) THEN
+      artSleep.Millis(100)
+    ELSIF status # artSocket.Ok THEN
+      LogErrorWithCode(logger, "Receive failed: ", status);
+      ok := FALSE
     END
+  UNTIL found OR ~ok;
+  IF (status = artSocket.Ok) & found THEN
+    DStrings.ToChars(dstr, buf, bytesRead);
+    LogInfoWithData(logger, "Received: ", buf);
+    ok := TRUE
   END;
+  RETURN ok
+END ReceiveResponse;
 
-  IF ~done THEN
-    (* Read response loop *)
-    REPEAT
-      n := 0;
-      err := artSocket.Receive(sock, buf, BUFSIZE, n);
-      IF n > 0 THEN
-        buf[n] := 0X;
-        LogInfoWithData(logger, "Received: ", buf)
-      ELSIF err = artSocket.WouldBlock THEN
-        (* Optionally yield or sleep here *)
-      ELSIF (n = 0) & (err = artSocket.Ok) THEN
-        (* No data yet, retry *)
-      ELSE
-        LogErrorWithCode(logger, "Receive failed: ", err);
-        done := TRUE
-      END
-    UNTIL (n > 0) OR done;
-  END;
-
+PROCEDURE Cleanup(sock: artSocket.Socket; logger: Log.Logger);
+BEGIN
   IF sock # NIL THEN artSocket.Close(sock) END;
-  Log.Info(logger, "Client done");
-  Log.Close(logger);
+  Log.Info(logger, "DSocket client done");
+  Log.Close(logger)
+END Cleanup;
+
+BEGIN
+  clientFinished := FALSE;
+  InitLogger(logger);
+  In.Open;
+  IF OpenSocket(sock, logger) THEN
+    IF ConnectToServer(sock, logger) THEN
+      SocketDStream.Init(sock, stream, logger);
+      REPEAT
+        In.Line(buf);
+        IF Chars.Equal("", buf) THEN
+          clientFinished := TRUE
+        ELSE
+          Chars.Append(Chars.LF, buf);
+          IF SendLine(stream, logger, buf) THEN
+            recvResult := ReceiveResponse(stream, logger, buf)
+          END;
+          Chars.Clear(buf)
+        END
+      UNTIL clientFinished OR recvResult = FALSE
+    END;
+    Cleanup(sock, logger)
+  END
 END ExampleSocketClient.
