@@ -89,12 +89,12 @@ VAR
     @param sstr - data to fill the buffer.
     @param stream - stream with the buffer. 
    *)
-  PROCEDURE FillBuffer(sstr : DStrings.String; VAR stream: SocketDStream);
+  PROCEDURE FillOutBuffer(sstr : DStrings.String; VAR stream: SocketDStream);
   BEGIN
     Log.Debug(stream.logger, "Copying data to stream buffer");
     DStrings.Copy(sstr, stream.outBuf);
     DStrings.Set(stream.outRider, stream.outBuf, 0);
-  END FillBuffer;
+  END FillOutBuffer;
 
   (* 
     Transmit the buffer contents over the stream socket. May perform a partial transfer if it would block.
@@ -119,12 +119,12 @@ VAR
     @param stream - stream descriptor.
     @param sent - number of bytes to remove.
     *)
-  PROCEDURE DrainBuffer(VAR stream : SocketDStream; sent : INTEGER);
+  PROCEDURE DrainOutBuffer(VAR stream : SocketDStream; sent : INTEGER);
   BEGIN
     Log.Debug(stream.logger, "Draining sent data from stream buffer");
     DStrings.Delete(stream.outBuf, 0, sent);
     DStrings.Set(stream.outRider, stream.outBuf, 0);
-  END DrainBuffer;
+  END DrainOutBuffer;
 
 BEGIN
   (* Initialize *)
@@ -140,7 +140,7 @@ BEGIN
   IF ~done THEN
     (* If there is no pending data, copy new data into outBuf *)
     IF DStrings.Length(stream.outBuf) = 0 THEN
-      FillBuffer(sstr, stream)
+      FillOutBuffer(sstr, stream)
     END;
 
     msgLen := DStrings.Length(stream.outBuf);
@@ -150,7 +150,7 @@ BEGIN
       (* If the send was successful or would block, we update the rider and buffer *)
       IF (result = artSocket.Ok) OR (result = artSocket.WouldBlock) THEN
         IF sent > 0 THEN
-          DrainBuffer(stream, sent)
+          DrainOutBuffer(stream, sent)
         END;
         bytesLeft := DStrings.Length(stream.outBuf);
       END
@@ -162,6 +162,22 @@ BEGIN
   END;
   RETURN result
 END SendDString;
+
+(* 
+  Copy and delete data up to and including delimiter from the stream buffer into dstr.
+  Reset the stream inbuf rider after the data is extracted to the start of the data left in the buffer.
+
+  @param stream - stream descriptor containing the input rider and buffer.
+  @param extractLen - position of delimiter in the stream buffer.
+  @param dstr - received data including the delimiter.
+*)
+PROCEDURE DrainInBuffer(stream: SocketDStream; extractLen: INTEGER; VAR dstr: DStrings.String);
+BEGIN
+  DStrings.Extract(stream.inBuf, 0, extractLen, dstr);
+  DStrings.Delete(stream.inBuf, 0, extractLen);
+  (* Position the rider to the remaining data for the next read. *)
+  DStrings.Set(stream.inRider, stream.inBuf, 0)
+END DrainInBuffer;
 
 (**
   Reads data from the nonblocking socket in a nonblocking way until 
@@ -225,21 +241,6 @@ VAR
     RETURN found
   END FindDelimitedSubString;
 
-  (* 
-    Copy and delete data up to and including delimiter from the stream buffer into dstr.
-    Reset the stream inbuf rider after the data is extracted to the start of the data left in the buffer.
-
-    @param stream - stream descriptor containing the input rider and buffer.
-    @param extractLen - position of delimiter in the stream buffer.
-    @param dstr - received data including the delimiter.
-  *)
-  PROCEDURE DrainBuffer(stream: SocketDStream; extractLen: INTEGER; VAR dstr: DStrings.String);
-  BEGIN
-    DStrings.Extract(stream.inBuf, 0, extractLen, dstr);
-    DStrings.Delete(stream.inBuf, 0, extractLen);
-    (* Position the rider to the remaining data for the next read. *)
-    DStrings.Set(stream.inRider, stream.inBuf, 0)
-  END DrainBuffer;
 
 BEGIN
   (* Initialize state *)
@@ -284,7 +285,7 @@ BEGIN
     (* Either data from the recent read or we still have unprocessed data in the buffer. *)
     IF FindDelimitedSubString(stream, delimStr, pos) THEN
         Log.Debug(stream.logger, "Delimiter found");
-        DrainBuffer(stream, pos, dstr);
+        DrainInBuffer(stream, pos, dstr);
         (* Clear the input buffer *)
         DStrings.Init("", stream.inBuf);
         DStrings.Set(stream.inRider, stream.inBuf, 0);
@@ -293,10 +294,78 @@ BEGIN
     ELSIF DStrings.Length(stream.inBuf) > 0 THEN
       (* No delimiter, append the buffered data to dstr, done remains unchanged. *)
       Log.Debug(stream.logger, "No delimiter found, appending data to dstr");
-      DrainBuffer(stream, pos, dstr);
+      DrainInBuffer(stream, pos, dstr);
     END
   END
   RETURN status
 END ReadUntil;
+
+(** 
+  Reads exactly nBytes bytes from the nonblocking socket into dstr.
+  Reading stops if:
+    - maxBytes bytes have been read,
+    - the socket would block,
+    - the socket is closed,
+    - or any other socket error occurs.
+
+  Call again if artSocket.WouldBlock is returned, as this indicates a partial read.
+  The caller must check bytesRead to determine how much data was actually read.
+
+  @param stream - initialized stream descriptor
+  @param nBytes - the exact number of bytes to read
+  @param dstr - the data read
+  @param bytesRead - the number of bytes actually read
+
+  @return the status of the socket read.
+*)
+PROCEDURE ReadNBytes*(stream: SocketDStream; nBytes: INTEGER; VAR dstr: DStrings.String; VAR bytesRead: INTEGER): INTEGER;
+VAR
+  status, received, toRead: INTEGER;
+  buf: ARRAY MaxBufferSize OF BYTE;
+  done: BOOLEAN;
+  available: INTEGER;
+BEGIN
+  bytesRead := 0;
+  DStrings.Init("", dstr);
+  status := artSocket.UnknownError;
+  done := FALSE;
+
+  (* Validate args *)
+  IF (stream = NIL) OR (dstr = NIL) OR (stream.socket = NIL) OR (nBytes <= 0) THEN
+    done := TRUE
+  END;
+
+  WHILE ~done DO
+    available := DStrings.Length(stream.inBuf);
+    IF available >= nBytes THEN
+      (* Enough data buffered, extract nBytes *)
+      DrainInBuffer(stream, nBytes, dstr);
+      bytesRead := nBytes;
+      status := artSocket.Ok;
+      done := TRUE
+    ELSE
+      (* Not enough buffered, extract what we have and try to read more *)
+      IF available > 0 THEN
+        (* Extract all available data so far *)
+        DrainInBuffer(stream, available, dstr);
+        bytesRead := available;
+      END;
+      toRead := nBytes - bytesRead;
+      IF toRead > MaxBufferSize THEN
+        toRead := MaxBufferSize
+      END;
+      status := artSocket.Receive(stream.socket, buf, toRead, received);
+      IF (status = artSocket.Ok) & (received > 0) THEN
+        DStrings.WriteBytes(stream.inRider, buf, received);
+        (* Loop again to check if we now have enough *)
+      ELSE
+        (* WouldBlock, Closed, or error: exit loop, return what we have *)
+        done := TRUE
+      END
+    END
+  END;
+  (* bytesRead is already set to what was extracted *)
+  RETURN status
+END ReadNBytes;
 
 END SocketDStream.

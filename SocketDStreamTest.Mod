@@ -55,15 +55,34 @@ BEGIN
   DStrings.Init("", dstr);
   delim[0] := Chars.LF; delim[1] := 0X;
   status := SocketDStream.ReadUntil(stream, delim, -1, dstr, found);
-  Tests.ExpectedInt(artSocket.UnknownError, status, "ReadUntil returns NotConnected for NIL stream", pass);
+  Tests.ExpectedInt(artSocket.UnknownError, status, "ReadUntil returns UnknownError for NIL stream", pass);
   Tests.ExpectedBool(FALSE, found, "ReadUntil found is FALSE for NIL stream", pass);
   RETURN pass
 END TestReadUntil_NilSocket;
+
+PROCEDURE TestReadNBytes_NilSocket(): BOOLEAN;
+VAR
+  pass: BOOLEAN;
+  stream: SocketDStream.SocketDStream;
+  dstr: DStrings.String;
+  status, bytesRead: INTEGER;
+  delim: ARRAY 2 OF CHAR;
+BEGIN
+  pass := TRUE;
+  stream := NIL;
+  DStrings.Init("", dstr);
+  delim[0] := Chars.LF; delim[1] := 0X;
+  status := SocketDStream.ReadNBytes(stream, 10, dstr, bytesRead);
+  Tests.ExpectedInt(artSocket.UnknownError, status, "ReadNBytes returns UnknownError for NIL stream", pass);
+  Tests.ExpectedInt(0, bytesRead, "ReadNBytes bytesRead is 0 for NIL stream", pass);
+  RETURN pass
+END TestReadNBytes_NilSocket;
 
 BEGIN
   Tests.Init(ts, "SocketDStream Tests");
   Tests.Add(ts, TestInit);
   Tests.Add(ts, TestSendDString_NilSocket);
   Tests.Add(ts, TestReadUntil_NilSocket);
+  Tests.Add(ts, TestReadNBytes_NilSocket);
   ASSERT(Tests.Run(ts));
 END SocketDStreamTest.
