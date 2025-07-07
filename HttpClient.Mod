@@ -6,7 +6,7 @@ Released under The 3-Clause BSD License.
 *)
 MODULE HttpClient;
 
-IMPORT DStrings, Convert := extConvert,
+IMPORT DStrings, Convert := extConvert, Chars,
        HttpRequest, HttpHeader, HttpResponse, HttpUrl, 
        artSocket, SocketDStream, Collections, Dictionary, Log;
 
@@ -42,7 +42,8 @@ TYPE
     reqStr: DStrings.String; (* Serialized request buffer *)
     reqBytesLeft: INTEGER;   (* Bytes left to send *)
     recvBuf: DStrings.String; (* Buffer for receiving response *)
-    recvDone: BOOLEAN        (* TRUE if response fully received *)
+    recvDone: BOOLEAN;        (* TRUE if response fully received *)
+    logger : Log.Logger
   END;
 
   CopyHeaderState = RECORD (Dictionary.DictVisitorState)
@@ -55,6 +56,7 @@ BEGIN
   IF client = NIL THEN
     NEW(client);
   END;
+  client.logger := Log.New(Log.DEBUG, Log.CONSOLE, "");
   client.state := Idle;
   client.socket := NIL;
   client.stream := NIL;
@@ -178,7 +180,6 @@ PROCEDURE ConnectSocketAndStream(client: HttpClient; host: DStrings.String; port
 VAR
   hostBuf: ARRAY MaxHostLen OF CHAR;
   truncated, status: INTEGER;
-  logger: Log.Logger;
   result: BOOLEAN;
 BEGIN
   client.socket := artSocket.NewSocket();
@@ -199,8 +200,7 @@ BEGIN
         client.error := ErrConnect;
         result := FALSE
       ELSE
-        logger := NIL; (* Optionally set a logger *)
-        SocketDStream.Init(client.socket, client.stream, logger);
+        SocketDStream.Init(client.socket, client.stream, client.logger);
         result := TRUE
       END
     END
@@ -289,6 +289,8 @@ VAR result: BOOLEAN;
       contentLenStr: DStrings.String;
       bodyBuf: DStrings.String;
       intBuf : ARRAY 16 OF CHAR;
+      found: BOOLEAN;
+      debugBuf : ARRAY 1024 OF CHAR;
   BEGIN
     IF client.recvBuf = NIL THEN
       DStrings.Init("", client.recvBuf)
@@ -310,7 +312,16 @@ VAR result: BOOLEAN;
                 DStrings.Append(client.recvBuf, bodyBuf)
               END
             END
+          ELSE
+            (* No Content-Length: try to read until newline for simple servers *)
+            DStrings.Init("", bodyBuf);
+            status := SocketDStream.ReadUntil(client.stream, Chars.LF, -1, bodyBuf, found);
+            IF (status = artSocket.Ok) & found THEN
+              DStrings.Append(client.recvBuf, bodyBuf)
+            END
           END;
+          DStrings.ToChars(client.recvBuf, debugBuf, truncated);
+          Log.Debug(client.logger, debugBuf);
           (* Parse again with full buffer *)
           ok := HttpResponse.ParseDString(client.recvBuf, client.resp);
           IF ok THEN
