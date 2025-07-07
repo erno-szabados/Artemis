@@ -36,7 +36,11 @@ TYPE
     req: HttpRequest.HttpRequest;
     resp: HttpResponse.HttpResponse;
     url: HttpUrl.Url;
-    error: INTEGER
+    error: INTEGER;
+    reqStr: DStrings.String; (* Serialized request buffer *)
+    reqBytesLeft: INTEGER;   (* Bytes left to send *)
+    recvBuf: DStrings.String; (* Buffer for receiving response *)
+    recvDone: BOOLEAN        (* TRUE if response fully received *)
   END;
 
 (** Initializes a new HttpClient instance. *)
@@ -214,15 +218,99 @@ BEGIN
   END
 END StartRequest;
 
-(** Advances the state machine by one step. Returns TRUE if more work is needed, FALSE if done or error. *)
+
 PROCEDURE Step*(client: HttpClient): BOOLEAN;
 VAR result: BOOLEAN;
+  (* Handles the Connecting state. Returns TRUE if more work is needed. *)
+  PROCEDURE HandleConnecting(client: HttpClient): BOOLEAN;
+  VAR result: BOOLEAN;
+  BEGIN
+    (* No probing needed: just transition to Sending and let the send operation handle readiness. *)
+    client.state := Sending;
+    result := TRUE;
+    RETURN result
+  END HandleConnecting;
+
+  (* Handles the Sending state. Returns TRUE if more work is needed. *)
+  PROCEDURE HandleSending(client: HttpClient): BOOLEAN;
+  VAR status: INTEGER; ok, result: BOOLEAN;
+  BEGIN
+    IF client.reqStr = NIL THEN
+      ok := HttpRequest.ToString(client.req, client.reqStr);
+      client.reqBytesLeft := DStrings.Length(client.reqStr)
+    END;
+    IF client.reqBytesLeft > 0 THEN
+      status := SocketDStream.SendDString(client.stream, client.reqStr, client.reqBytesLeft);
+      IF (status = artSocket.Ok) OR (status = artSocket.WouldBlock) THEN
+        IF client.reqBytesLeft = 0 THEN
+          client.state := Receiving;
+          result := TRUE
+        ELSE
+          result := TRUE
+        END
+      ELSE
+        client.state := Error;
+        client.error := ErrRequestSerialization;
+        result := FALSE
+      END
+    ELSE
+      client.state := Receiving;
+      result := TRUE
+    END;
+    RETURN result
+  END HandleSending;
+
+  (* Handles the Receiving state. Returns TRUE if more work is needed. *)
+  PROCEDURE HandleReceiving(client: HttpClient): BOOLEAN;
+  VAR status: INTEGER; found, ok, result: BOOLEAN;
+  BEGIN
+    IF client.recvBuf = NIL THEN
+      DStrings.Init("", client.recvBuf)
+    END;
+    status := SocketDStream.ReadUntil(client.stream, "\r\n\r\n", -1, client.recvBuf, found);
+    IF (status = artSocket.Ok) OR (status = artSocket.WouldBlock) THEN
+      IF found THEN
+        ok := HttpResponse.ParseDString(client.recvBuf, client.resp);
+        IF ok THEN
+          client.state := Done;
+          client.recvDone := TRUE;
+          result := FALSE
+        ELSE
+          client.state := Error;
+          client.error := ErrRequestSerialization;
+          result := FALSE
+        END
+      ELSE
+        result := TRUE
+      END
+    ELSE
+      client.state := Error;
+      client.error := ErrRequestSerialization;
+      result := FALSE
+    END;
+    RETURN result
+  END HandleReceiving;
+
 BEGIN
+  result := FALSE;
   IF client # NIL THEN
-    (* Implementation to be filled in *)
-    result := FALSE
-  ELSE
-    result := FALSE
+    CASE client.state OF
+      Connecting:
+        result := HandleConnecting(client)
+      |
+      Sending:
+        result := HandleSending(client)
+      |
+      Receiving:
+        result := HandleReceiving(client)
+      |
+      Done:
+        result := FALSE
+      |
+      Error:
+        result := FALSE
+    END;
+    (* If state is not a known value, result remains FALSE *)
   END;
   RETURN result
 END Step;
