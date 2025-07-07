@@ -135,8 +135,15 @@ BEGIN
   END
 END ReadHeaderBlock;
 
-(** Parses a raw HTTP response (ARRAY OF CHAR) into a HttpResponse. Returns TRUE on success. *)
-PROCEDURE Parse*(raw: ARRAY OF CHAR; VAR resp: HttpResponse): BOOLEAN;
+(** 
+  Parses a raw HTTP response (DString) into a HttpResponse. 
+
+  @raw - the unparsed response
+  @resp - the parsed response
+
+  @return TRUE on success, FALSE on error. 
+ *)
+PROCEDURE ParseDString*(raw : DStrings.String; VAR resp: HttpResponse) :BOOLEAN;
 VAR
   ok, statusOk, headerParseOk: BOOLEAN;
   input, versionStr, statusStr, reasonStr, headerBlock: DStrings.String;
@@ -145,7 +152,7 @@ VAR
 BEGIN
   ok := FALSE;
   IF resp # NIL THEN
-    DStrings.Init(raw, input);
+    DStrings.Copy(raw, input);
     DStrings.Set(reader, input, 0);
     DStrings.Init("", versionStr); DStrings.Init("", statusStr); DStrings.Init("", reasonStr);
     code := 0;
@@ -180,8 +187,24 @@ BEGIN
     ok := FALSE
   END;
   RETURN ok
-END Parse;
+END ParseDString;
 
+(** 
+  Parses a raw HTTP response (ARRAY OF CHAR) into a HttpResponse. 
+  Wraps ParseDString.
+
+  @raw - the unparsed response
+  @resp - the parsed response
+
+  @return TRUE on success, FALSE on error. 
+ *)
+PROCEDURE Parse*(raw: ARRAY OF CHAR; VAR resp: HttpResponse): BOOLEAN; 
+VAR
+  input: DStrings.String;
+BEGIN
+  DStrings.Init(raw, input);
+  RETURN ParseDString(input, resp)
+END Parse;
 
 
 (** Returns the status code. *)
