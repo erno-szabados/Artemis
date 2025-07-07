@@ -6,7 +6,9 @@ Released under The 3-Clause BSD License.
 *)
 MODULE HttpClient;
 
-IMPORT DStrings, HttpRequest, HttpHeader, Collections, Dictionary, HttpResponse, HttpUrl, artSocket, SocketDStream, Log;
+IMPORT DStrings, Convert := extConvert,
+       HttpRequest, HttpHeader, HttpResponse, HttpUrl, 
+       artSocket, SocketDStream, Collections, Dictionary, Log;
 
 CONST
   Idle = 0;
@@ -280,19 +282,46 @@ VAR result: BOOLEAN;
 
   (* Handles the Receiving state. Returns TRUE if more work is needed. *)
   PROCEDURE HandleReceiving(client: HttpClient): BOOLEAN;
-  VAR status: INTEGER; found, ok, result: BOOLEAN;
+  VAR truncated, status: INTEGER; 
+      ok, result, done: BOOLEAN;
+      headerEnd: BOOLEAN;
+      contentLen, bytesRead: INTEGER;
+      contentLenStr: DStrings.String;
+      bodyBuf: DStrings.String;
+      intBuf : ARRAY 16 OF CHAR;
   BEGIN
     IF client.recvBuf = NIL THEN
       DStrings.Init("", client.recvBuf)
     END;
-    status := SocketDStream.ReadUntil(client.stream, "\r\n\r\n", -1, client.recvBuf, found);
+    status := SocketDStream.ReadUntil(client.stream, "\r\n\r\n", -1, client.recvBuf, headerEnd);
     IF (status = artSocket.Ok) OR (status = artSocket.WouldBlock) THEN
-      IF found THEN
-        ok := HttpResponse.ParseDString(client.recvBuf, client.resp);
-        IF ok THEN
-          client.state := Done;
-          client.recvDone := TRUE;
-          result := FALSE
+      IF headerEnd THEN
+        (* Try to get Content-Length header *)
+        contentLen := 0;
+        IF HttpResponse.ParseDString(client.recvBuf, client.resp) THEN
+          ok := HttpHeader.Get(client.resp.headers, "Content-Length", contentLenStr);
+          IF ok THEN
+            DStrings.ToChars(contentLenStr, intBuf, truncated);
+            Convert.StringToInt(intBuf, contentLen, done);
+            IF contentLen > 0 THEN
+              DStrings.Init("", bodyBuf);
+              status := SocketDStream.ReadNBytes(client.stream, contentLen, bodyBuf, bytesRead);
+              IF (status = artSocket.Ok) & (bytesRead = contentLen) THEN
+                DStrings.Append(client.recvBuf, bodyBuf)
+              END
+            END
+          END;
+          (* Parse again with full buffer *)
+          ok := HttpResponse.ParseDString(client.recvBuf, client.resp);
+          IF ok THEN
+            client.state := Done;
+            client.recvDone := TRUE;
+            result := FALSE
+          ELSE
+            client.state := Error;
+            client.error := ErrRequestSerialization;
+            result := FALSE
+          END
         ELSE
           client.state := Error;
           client.error := ErrRequestSerialization;
