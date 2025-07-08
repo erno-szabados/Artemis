@@ -256,45 +256,56 @@ BEGIN
     done := TRUE
   END;
 
-  (* Read data from a valid stream socket *)
+  (* First, check if the delimiter is already in the buffer from a previous read *)
+  IF ~done THEN
+    found := FindDelimitedSubString(stream, delimStr, pos);
+    IF found THEN
+      DrainInBuffer(stream, pos, dstr);
+      status := artSocket.Ok;
+      done := TRUE
+    END
+  END;
+
+  (* If not found, read from socket and accumulate data *)
   WHILE ~done DO
-    (* Keep reading *)
     status := artSocket.Receive(stream.socket, buf, LEN(buf), received);
-    IF (status = artSocket.Ok) THEN
-      IF (received = 0) THEN
+    IF status = artSocket.Ok THEN
+      IF received = 0 THEN
         Log.Debug(stream.logger, "Client closed the socket.");
         status := artSocket.Closed;
         done := TRUE
-      ELSIF (received > 0) THEN 
+      ELSIF received > 0 THEN
         Log.Debug(stream.logger, "Received data from socket, buffering");
-        IF (maxBytes # -1) & (bytesRead + received > maxBytes) THEN
-          (* Do not buffer if we would exceed MaxBytes. *)
-          received := maxBytes - bytesRead;
-          (* Must abort as we read the allowed amount. *)
-          done := TRUE
+        IF (maxBytes # -1) & (DStrings.Length(stream.inBuf) + received > maxBytes) THEN
+          received := maxBytes - DStrings.Length(stream.inBuf)
         END;
-        bytesRead := bytesRead + received;
-        DStrings.WriteBytes(stream.inRider, buf, received)
+        IF received > 0 THEN
+          DStrings.WriteBytes(stream.inRider, buf, received)
+        END;
+        (* Now check the combined buffer for the delimiter *)
+        found := FindDelimitedSubString(stream, delimStr, pos);
+        IF found THEN
+          DrainInBuffer(stream, pos, dstr);
+          done := TRUE
+        ELSIF (maxBytes # -1) & (DStrings.Length(stream.inBuf) >= maxBytes) THEN
+          (* Reached maxBytes without finding delimiter, exit *)
+          done := TRUE
+        END
       END
     ELSE
-      (* If wouldBlock is returned, there was no data to copy. *)
-      (* Socket status (error, wouldBlock or EOF) will be returned. *)
+      (* Any other status (WouldBlock, Error) terminates the loop *)
       done := TRUE
-    END;
-    
-    (* Either data from the recent read or we still have unprocessed data in the buffer. *)
-    IF FindDelimitedSubString(stream, delimStr, pos) THEN
-        Log.Debug(stream.logger, "Delimiter found");
-        DrainInBuffer(stream, pos, dstr);
-        (* Leave the rest for subsequent reads. *)
-        found := TRUE;
-        done := TRUE;
-    ELSIF DStrings.Length(stream.inBuf) > 0 THEN
-      (* No delimiter, append the buffered data to dstr, done remains unchanged. *)
-      Log.Debug(stream.logger, "No delimiter found, appending data to dstr");
-      DrainInBuffer(stream, pos, dstr);
     END
-  END
+  END;
+
+  (* If we exited the loop without finding the delimiter (e.g. socket closed),
+     return what we have accumulated so far. *)
+  IF ~found & (DStrings.Length(stream.inBuf) > 0) THEN
+    DStrings.Copy(stream.inBuf, dstr);
+    DStrings.Init("", stream.inBuf);
+    DStrings.Set(stream.inRider, stream.inBuf, 0)
+  END;
+
   RETURN status
 END ReadUntil;
 
