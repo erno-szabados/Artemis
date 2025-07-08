@@ -19,6 +19,8 @@ CONST
   Error = 5;
 
   MaxHostLen = 1024;
+  MaxBodySizeWithoutLength = 4 * 1024 * 1024; (* 4MB limit for responses without Content-Length *)
+
 
   (* Error codes for HttpClient.error *)
   ErrNone = 0;
@@ -360,17 +362,16 @@ VAR result: BOOLEAN;
             result := TRUE
           END
         ELSE
-          Log.Debug(client.logger, "Reading 1024 bytes");
-          (* TODO: the right thing would be to read until socket is closed 
-              (need to add this to SocketDStream). *)
-          status := SocketDStream.ReadNBytes(client.stream, 1024, bodyBuf, bytesRead);
-          IF bytesRead > 0 THEN
+          Log.Debug(client.logger, "No Content-Length, reading until socket close (max 4MB).");
+          (* Read from the stream until the server closes the connection, with a size limit. *)
+          status := SocketDStream.ReadUntilClose(client.stream, MaxBodySizeWithoutLength, bodyBuf, bytesRead);
+          IF (status = artSocket.Closed) OR (bytesRead > 0) THEN
             DStrings.Copy(bodyBuf, client.resp.body);
             result := TRUE
           ELSE
             Convert.IntToString(status, intBuf, ok);
             Log.Error(client.logger, "Read failed. Status:");
-            Log.Error(client.logger, intBuf);
+            Log.Error(client.logger, intBuf)
           END
         END
       END;

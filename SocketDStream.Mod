@@ -370,4 +370,84 @@ BEGIN
   RETURN status
 END ReadNBytes;
 
+(**
+  Reads from the nonblocking socket until the connection is closed by the peer,
+  up to a specified maximum number of bytes. This is useful for reading response
+  bodies where no Content-Length is provided.
+
+  Reading stops if:
+    - The socket is closed by the peer (returns artSocket.Closed).
+    - maxBytes have been read (returns artSocket.Ok).
+    - The socket would block (returns artSocket.WouldBlock, partial data is returned).
+    - Any other socket error occurs.
+
+  @param stream - initialized stream descriptor
+  @param maxBytes - the maximum number of bytes to read
+  @param dstr - the data read
+  @param bytesRead - the number of bytes actually read
+
+  @return the status of the socket read.
+*)
+PROCEDURE ReadUntilClose*(stream: SocketDStream; maxBytes: INTEGER; VAR dstr: DStrings.String; VAR bytesRead: INTEGER): INTEGER;
+VAR
+  status, received, toRead, available, chunk: INTEGER;
+  buf: ARRAY MaxBufferSize OF BYTE;
+  done: BOOLEAN;
+  w: DStrings.Rider;
+BEGIN
+  bytesRead := 0;
+  DStrings.Init("", dstr);
+  DStrings.Set(w, dstr, 0);
+  status := artSocket.UnknownError;
+  done := FALSE;
+
+  (* Validate args *)
+  IF (stream = NIL) OR (dstr = NIL) OR (stream.socket = NIL) OR (maxBytes <= 0) THEN
+    Log.Error(stream.logger, "ReadUntilClose: Invalid arguments");
+    status := artSocket.UnknownError;
+    done := TRUE
+  END;
+
+  WHILE ~done & (bytesRead < maxBytes) DO
+    available := DStrings.Length(stream.inBuf);
+    IF available > 0 THEN
+      (* Consume data from the internal buffer first *)
+      toRead := maxBytes - bytesRead;
+      IF toRead > available THEN
+        chunk := available
+      ELSE
+        chunk := toRead
+      END;
+      DrainInBuffer(stream, chunk, dstr);
+      bytesRead := bytesRead + chunk
+    ELSE
+      (* Buffer is empty, read from socket *)
+      toRead := maxBytes - bytesRead;
+      IF toRead > MaxBufferSize THEN
+        toRead := MaxBufferSize
+      END;
+      status := artSocket.Receive(stream.socket, buf, toRead, received);
+      IF status = artSocket.Ok THEN
+        IF received > 0 THEN
+          DStrings.WriteBytes(w, buf, received);
+          bytesRead := bytesRead + received
+        ELSE (* received = 0 *)
+          Log.Debug(stream.logger, "ReadUntilClose: Socket closed by peer.");
+          status := artSocket.Closed;
+          done := TRUE
+        END
+      ELSE
+        (* WouldBlock, Error, etc. - exit loop *)
+        done := TRUE
+      END
+    END
+  END;
+
+  IF (status = artSocket.Ok) & (bytesRead = maxBytes) THEN
+    Log.Debug(stream.logger, "ReadUntilClose: Reached maxBytes limit.");
+  END;
+
+  RETURN status
+END ReadUntilClose;
+
 END SocketDStream.
