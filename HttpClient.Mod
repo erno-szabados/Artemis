@@ -61,7 +61,7 @@ BEGIN
   client.socket := NIL;
   client.stream := NIL;
   client.req := NIL;
-  client.resp := NIL;
+  HttpResponse.Init(client.resp, client.logger);
   client.url := NIL;
   client.error := 0
 END Init;
@@ -97,6 +97,7 @@ BEGIN
   client.error := ErrNone;
   client.req := NIL;
   client.resp := NIL;
+  HttpResponse.Init(client.resp, client.logger);
   client.url := NIL;
   client.socket := NIL;
   client.stream := NIL
@@ -239,8 +240,10 @@ BEGIN
 END StartRequest;
 
 
+
 PROCEDURE Step*(client: HttpClient): BOOLEAN;
 VAR result: BOOLEAN;
+
   (* Handles the Connecting state. Returns TRUE if more work is needed. *)
   PROCEDURE HandleConnecting(client: HttpClient): BOOLEAN;
   VAR result: BOOLEAN;
@@ -279,7 +282,6 @@ VAR result: BOOLEAN;
     END;
     RETURN result
   END HandleSending;
-
   
   (* Handles the Receiving state. Returns TRUE if more work is needed. *)
   PROCEDURE HandleReceiving(client: HttpClient): BOOLEAN;
@@ -290,123 +292,102 @@ VAR result: BOOLEAN;
       delim : ARRAY 4 OF CHAR;
       delimStr : DStrings.String;
   
-  (* Helper: Ensure the receive buffer is initialized *)
-  PROCEDURE EnsureRecvBuf(client: HttpClient);
-  BEGIN
-    IF client.recvBuf = NIL THEN
-      DStrings.Init("", client.recvBuf)
-    END
-  END EnsureRecvBuf;
-
-  (* Helper: Initialize the CRLFCRLF delimiter array *)
-  PROCEDURE InitHeaderDelimiter(VAR delim: ARRAY OF CHAR);
-  BEGIN
-    delim[0] := Chars.CR; delim[1] := Chars.LF; delim[2] := Chars.CR; delim[3] := Chars.LF
-  END InitHeaderDelimiter;
-
-  (* Helper: Log the current receive buffer for debugging *)
-  PROCEDURE DebugLogRecvBuf(client: HttpClient);
-  VAR debugBuf: ARRAY 1024 OF CHAR; truncated: INTEGER;
-  BEGIN
-    DStrings.ToChars(client.recvBuf, debugBuf, truncated);
-    Log.Debug(client.logger, debugBuf)
-  END DebugLogRecvBuf;
-
-  (* Helper: Try to get Content-Length header, returns TRUE if found and sets contentLen *)
-  PROCEDURE TryToGetContentLength(client: HttpClient; VAR contentLen: INTEGER): BOOLEAN;
-  VAR contentLenStr: DStrings.String; intBuf: ARRAY 16 OF CHAR; truncated: INTEGER; ok, done, result: BOOLEAN;
-  BEGIN
-    ok := HttpHeader.Get(client.resp.headers, "Content-Length", contentLenStr);
-    IF ok THEN
-      DStrings.ToChars(contentLenStr, intBuf, truncated);
-      Convert.StringToInt(intBuf, contentLen, done);
-      result := done & (contentLen > 0)
-    ELSE
-      contentLen := 0;
-      result := FALSE
-    END;
-    RETURN result
-  END TryToGetContentLength;
-
-  (* Helper: Handle reading body with Content-Length *)
-  PROCEDURE HandleContentLength(client: HttpClient; contentLen: INTEGER): BOOLEAN;
-  VAR bodyBuf: DStrings.String; status, bytesRead: INTEGER; result: BOOLEAN;
-  BEGIN
-    DStrings.Init("", bodyBuf);
-    status := SocketDStream.ReadNBytes(client.stream, contentLen, bodyBuf, bytesRead);
-    IF (status = artSocket.Ok) & (bytesRead = contentLen) THEN
-      DStrings.Append(client.recvBuf, bodyBuf)
-    END;
-    result := TRUE;
-    RETURN result
-  END HandleContentLength;
-
-  (* Helper: Handle headers-only response (ends with CRLFCRLF)) *)
-  PROCEDURE HandleHeadersOnly(client: HttpClient; delimStr: DStrings.String): BOOLEAN;
-  VAR len: INTEGER; endsWithCRLFCRLF, ok, result: BOOLEAN;
-  BEGIN
-    len := DStrings.Length(client.recvBuf);
-    endsWithCRLFCRLF := FALSE;
-    IF len >= 4 THEN
-      endsWithCRLFCRLF := DStrings.Pos(delimStr, client.recvBuf, len - 4) # -1;
-    END;
-    IF endsWithCRLFCRLF THEN
-      Log.Debug(client.logger, "Headers only response");
-      ok := HttpResponse.ParseDString(client.recvBuf, client.resp);
-      IF ok THEN
-        client.state := Done;
-        client.recvDone := TRUE;
-        result := TRUE
-      ELSE
-        client.state := Error;
-        client.error := ErrRequestSerialization;
-        result := TRUE
+    (* Helper: Ensure the receive buffer is initialized *)
+    PROCEDURE EnsureRecvBuf(client: HttpClient);
+    BEGIN
+      IF client.recvBuf = NIL THEN
+        DStrings.Init("", client.recvBuf)
       END
-    ELSE
-      result := FALSE
-    END;
-    RETURN result
-  END HandleHeadersOnly;
+    END EnsureRecvBuf;
 
-  (* Helper: Handle no Content-Length, try to read until newline for simple servers *)
-  PROCEDURE HandleNoContentLength(client: HttpClient): BOOLEAN;
-  VAR bodyBuf: DStrings.String; status: INTEGER; found, ok, result: BOOLEAN;
-  BEGIN
-    DStrings.Init("", bodyBuf);
-    status := SocketDStream.ReadUntil(client.stream, Chars.LF, -1, bodyBuf, found);
-    IF (status = artSocket.Ok) & found THEN
-      DStrings.Append(client.recvBuf, bodyBuf)
-    END;
-    ok := HttpResponse.ParseDString(client.recvBuf, client.resp);
-    IF ok THEN
-      client.state := Done;
-      client.recvDone := TRUE;
-      result := TRUE
-    ELSE
-      client.state := Error;
-      client.error := ErrRequestSerialization;
-      result := TRUE
-    END;
-    RETURN result
-  END HandleNoContentLength;
+    (* Helper: Log the current receive buffer for debugging *)
+    PROCEDURE DebugLogRecvBuf(client: HttpClient);
+    VAR debugBuf: ARRAY 1024 OF CHAR; truncated: INTEGER;
+    BEGIN
+      DStrings.ToChars(client.recvBuf, debugBuf, truncated);
+      Log.Debug(client.logger, debugBuf)
+    END DebugLogRecvBuf;
+
+    (* Parses the response body after headers have been parsed.
+        This procedure inspects the headers and reads the body accordingly.
+        Returns TRUE if the body was successfully read, FALSE on error.
+        The body is stored in client.resp.body. *)
+    PROCEDURE ParseBody(client: HttpClient): BOOLEAN;
+    VAR
+      contentLen: INTEGER;
+      bodyBuf: DStrings.String;
+      status, bytesRead: INTEGER;
+      found, result, ok: BOOLEAN;
+      intBuf : ARRAY 16 OF CHAR;
+
+    (* 
+      Helper: Process Content-Length header (if exist).
+
+      @param client - client descriptor
+      @param contentLen - return the extracted content-length value (if found)
+
+      @return TRUE if found and contentLen was set. 
+    *)
+      PROCEDURE ProcessContentLength(client: HttpClient; VAR contentLen: INTEGER): BOOLEAN;
+      VAR contentLenStr: DStrings.String; intBuf: ARRAY 16 OF CHAR; truncated: INTEGER; ok, done, result: BOOLEAN;
+      BEGIN
+        ok := HttpHeader.Get(client.resp.headers, "Content-Length", contentLenStr);
+        IF ok THEN
+          DStrings.ToChars(contentLenStr, intBuf, truncated);
+          Convert.StringToInt(intBuf, contentLen, done);
+          result := done & (contentLen > 0)
+        ELSE
+          contentLen := 0;
+          result := FALSE
+        END;
+        RETURN result
+      END ProcessContentLength;
+
+    BEGIN
+      Log.Debug(client.logger, "Parsing body");
+      
+      DStrings.Init("", bodyBuf);
+      result := FALSE;
+      IF (client # NIL) & (client.resp # NIL) THEN
+        IF ProcessContentLength(client, contentLen) THEN
+          (* Read the specified amount of bytes. *)
+          status := SocketDStream.ReadNBytes(client.stream, contentLen, bodyBuf, bytesRead);
+          IF (status = artSocket.Ok) & (bytesRead = contentLen) THEN
+            DStrings.Copy(bodyBuf, client.resp.body);
+            result := TRUE
+          END
+        ELSE
+          Log.Debug(client.logger, "Reading 1024 bytes");
+          (* TODO: the right thing would be to read until socket is closed 
+              (need to add this to SocketDStream). *)
+          status := SocketDStream.ReadNBytes(client.stream, 1024, bodyBuf, bytesRead);
+          IF bytesRead > 0 THEN
+            DStrings.Copy(bodyBuf, client.resp.body);
+            result := TRUE
+          ELSE
+            Convert.IntToString(status, intBuf, ok);
+            Log.Error(client.logger, "Read failed. Status:");
+            Log.Error(client.logger, intBuf);
+          END
+        END
+      END;
+      RETURN result
+
+    END ParseBody;
 
   BEGIN
     EnsureRecvBuf(client);
-    InitHeaderDelimiter(delim);
+    delim[0] := Chars.CR; delim[1] := Chars.LF; delim[2] := Chars.CR; delim[3] := Chars.LF;
     DStrings.Init(delim, delimStr);
     status := SocketDStream.ReadUntil(client.stream, delim, -1, client.recvBuf, headerEnd);
     IF (status = artSocket.Ok) OR (status = artSocket.WouldBlock) THEN
       IF headerEnd THEN
         DebugLogRecvBuf(client);
         contentLen := 0;
-        IF HttpResponse.ParseDString(client.recvBuf, client.resp) THEN
-          IF TryToGetContentLength(client, contentLen) THEN
-            ok := HandleContentLength(client, contentLen)
-          ELSIF HandleHeadersOnly(client, delimStr) THEN
-            (* handled inside helper *)
-          ELSE
-            ok := HandleNoContentLength(client)
-          END
+        IF HttpResponse.ParseResponseDString(client.recvBuf, client.resp) THEN
+          result := ParseBody(client);
+          client.state := Done;
+          client.error := ErrNone
         ELSE
           Log.Error(client.logger, "Response parsing failed");
           client.state := Error;

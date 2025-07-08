@@ -15,7 +15,7 @@ MODULE HttpResponse;
 
  *)
 
-IMPORT DStrings, HttpHeader, Chars, extConvert;
+IMPORT DStrings, HttpHeader, Chars, extConvert, Log;
 
 CONST
   Ok* = 0;
@@ -31,7 +31,8 @@ TYPE
     reason*: DStrings.String;       (* e.g., "OK" *)
     headers*: HttpHeader.Header;    (* parsed headers *)
     body*: DStrings.String;         (* response body *)
-    error*: INTEGER                 (* 0 = OK, nonzero = parse error *)
+    error*: INTEGER;                (* 0 = OK, nonzero = parse error *)
+    logger : Log.Logger
   END;
 
 (* Internal: Reads a line from the rider into 'line', handling CR, LF, or CRLF. Returns TRUE if a line was read. *)
@@ -137,13 +138,15 @@ END ReadHeaderBlock;
 
 (** 
   Parses a raw HTTP response (DString) into a HttpResponse. 
+  Populates the Status and Header,  but does not parse the body, 
+  as body processing depends on header contents and status.
 
   @raw - the unparsed response
   @resp - the parsed response
 
   @return TRUE on success, FALSE on error. 
  *)
-PROCEDURE ParseDString*(raw : DStrings.String; VAR resp: HttpResponse) :BOOLEAN;
+PROCEDURE ParseResponseDString*(raw : DStrings.String; VAR resp: HttpResponse) :BOOLEAN;
 VAR
   ok, statusOk, headerParseOk: BOOLEAN;
   input, versionStr, statusStr, reasonStr, headerBlock: DStrings.String;
@@ -174,7 +177,8 @@ BEGIN
         ok := TRUE;
         (* Extract body: read the rest of the input after headers *)
         DStrings.Init("", resp.body);
-        DStrings.ReadDString(reader, resp.body); 
+         (* Body is not parsed here. It will be handled by the caller (HttpClient)
+           which has access to the socket stream. *) 
         ELSE
         resp.error := ParseError;
         ok := FALSE
@@ -187,10 +191,12 @@ BEGIN
     ok := FALSE
   END;
   RETURN ok
-END ParseDString;
+END ParseResponseDString;
 
 (** 
   Parses a raw HTTP response (ARRAY OF CHAR) into a HttpResponse. 
+  Populates the Status and Header,  but does not parse the body, 
+  as body processing depends on header contents and status.
   Wraps ParseDString.
 
   @raw - the unparsed response
@@ -198,13 +204,13 @@ END ParseDString;
 
   @return TRUE on success, FALSE on error. 
  *)
-PROCEDURE Parse*(raw: ARRAY OF CHAR; VAR resp: HttpResponse): BOOLEAN; 
+PROCEDURE ParseResponse*(raw: ARRAY OF CHAR; VAR resp: HttpResponse): BOOLEAN; 
 VAR
   input: DStrings.String;
 BEGIN
   DStrings.Init(raw, input);
-  RETURN ParseDString(input, resp)
-END Parse;
+  RETURN ParseResponseDString(input, resp)
+END ParseResponse;
 
 
 (** Returns the status code. *)
@@ -275,11 +281,12 @@ BEGIN
 END IsOk;
 
 (** Initializes a HttpResponse descriptor to safe defaults. *)
-PROCEDURE Init*(VAR resp: HttpResponse);
+PROCEDURE Init*(VAR resp: HttpResponse; logger: Log.Logger);
 BEGIN
   IF resp = NIL THEN
     NEW(resp)
   END;
+  resp.logger := logger;
   DStrings.Init("", resp.version);
   resp.statusCode := 0;
   DStrings.Init("", resp.reason);

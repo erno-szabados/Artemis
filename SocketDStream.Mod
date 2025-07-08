@@ -286,9 +286,7 @@ BEGIN
     IF FindDelimitedSubString(stream, delimStr, pos) THEN
         Log.Debug(stream.logger, "Delimiter found");
         DrainInBuffer(stream, pos, dstr);
-        (* Clear the input buffer *)
-        DStrings.Init("", stream.inBuf);
-        DStrings.Set(stream.inRider, stream.inBuf, 0);
+        (* Leave the rest for subsequent reads. *)
         found := TRUE;
         done := TRUE;
     ELSIF DStrings.Length(stream.inBuf) > 0 THEN
@@ -359,6 +357,7 @@ BEGIN
         DStrings.WriteBytes(stream.inRider, buf, received);
         (* Loop again to check if we now have enough *)
       ELSE
+        Log.Debug(stream.logger, "Socket closed or error");
         (* WouldBlock, Closed, or error: exit loop, return what we have *)
         done := TRUE
       END

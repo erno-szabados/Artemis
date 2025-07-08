@@ -17,6 +17,8 @@ VAR
   body: DStrings.String;
   resp: HttpResponse.HttpResponse;
   done, ok: BOOLEAN;
+  buf : ARRAY 1024 OF CHAR;
+  truncated : INTEGER;
 
 BEGIN
   logger := Log.New(Log.INFO, Log.CONSOLE, "");
@@ -43,6 +45,8 @@ BEGIN
   IF HttpClient.GetResponse(client, resp) THEN
     Log.Info(logger, "Request complete, response received.");
     (* Optionally print status, headers, body *)
+    DStrings.ToChars(resp.body, buf, truncated);
+    Log.Debug(logger, buf);
   ELSE
     Log.Error(logger, "Request failed or no response.")
   END;
