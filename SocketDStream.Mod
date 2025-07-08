@@ -329,10 +329,9 @@ END ReadUntil;
 *)
 PROCEDURE ReadNBytes*(stream: SocketDStream; nBytes: INTEGER; VAR dstr: DStrings.String; VAR bytesRead: INTEGER): INTEGER;
 VAR
-  status, received, toRead: INTEGER;
+  status, received, toRead, available, chunk: INTEGER;
   buf: ARRAY MaxBufferSize OF BYTE;
   done: BOOLEAN;
-  available: INTEGER;
 BEGIN
   bytesRead := 0;
   DStrings.Init("", dstr);
@@ -341,24 +340,22 @@ BEGIN
 
   (* Validate args *)
   IF (stream = NIL) OR (dstr = NIL) OR (stream.socket = NIL) OR (nBytes <= 0) THEN
+    Log.Error(stream.logger, "ReadNBytes: Invalid arguments");
     done := TRUE
   END;
 
-  WHILE ~done DO
+  WHILE ~done & (bytesRead < nBytes) DO
     available := DStrings.Length(stream.inBuf);
-    IF available >= nBytes THEN
-      (* Enough data buffered, extract nBytes *)
-      DrainInBuffer(stream, nBytes, dstr);
-      bytesRead := nBytes;
-      status := artSocket.Ok;
-      done := TRUE
-    ELSE
-      (* Not enough buffered, extract what we have and try to read more *)
-      IF available > 0 THEN
-        (* Extract all available data so far *)
-        DrainInBuffer(stream, available, dstr);
-        bytesRead := available;
+    IF available > 0 THEN
+      toRead := nBytes - bytesRead;
+      IF toRead > available THEN
+        chunk := available
+      ELSE
+        chunk := toRead
       END;
+      DrainInBuffer(stream, chunk, dstr);
+      bytesRead := bytesRead + chunk
+    ELSE
       toRead := nBytes - bytesRead;
       IF toRead > MaxBufferSize THEN
         toRead := MaxBufferSize
@@ -368,13 +365,14 @@ BEGIN
         DStrings.WriteBytes(stream.inRider, buf, received);
         (* Loop again to check if we now have enough *)
       ELSE
-        Log.Debug(stream.logger, "Socket closed or error");
-        (* WouldBlock, Closed, or error: exit loop, return what we have *)
+        Log.Debug(stream.logger, "ReadNBytes: Socket closed or error");
         done := TRUE
       END
     END
   END;
-  (* bytesRead is already set to what was extracted *)
+  IF bytesRead = nBytes THEN
+    status := artSocket.Ok
+  END;
   RETURN status
 END ReadNBytes;
 

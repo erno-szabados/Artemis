@@ -286,7 +286,7 @@ VAR result: BOOLEAN;
   (* Handles the Receiving state. Returns TRUE if more work is needed. *)
   PROCEDURE HandleReceiving(client: HttpClient): BOOLEAN;
   VAR status: INTEGER; 
-      ok, result: BOOLEAN;
+      result: BOOLEAN;
       headerEnd: BOOLEAN;
       contentLen: INTEGER;
       delim : ARRAY 4 OF CHAR;
@@ -302,9 +302,12 @@ VAR result: BOOLEAN;
 
     (* Helper: Log the current receive buffer for debugging *)
     PROCEDURE DebugLogRecvBuf(client: HttpClient);
-    VAR debugBuf: ARRAY 1024 OF CHAR; truncated: INTEGER;
+    VAR debugBuf: ARRAY 1024 OF CHAR; truncated: INTEGER; ok : BOOLEAN;
     BEGIN
       DStrings.ToChars(client.recvBuf, debugBuf, truncated);
+      Log.Debug(client.logger, debugBuf);
+      Convert.IntToString(DStrings.Length(client.recvBuf), debugBuf, ok);
+      Log.Debug(client.logger, "Length:");
       Log.Debug(client.logger, debugBuf)
     END DebugLogRecvBuf;
 
@@ -317,7 +320,7 @@ VAR result: BOOLEAN;
       contentLen: INTEGER;
       bodyBuf: DStrings.String;
       status, bytesRead: INTEGER;
-      found, result, ok: BOOLEAN;
+      result, ok: BOOLEAN;
       intBuf : ARRAY 16 OF CHAR;
 
     (* 
