@@ -21,7 +21,7 @@ VAR
   truncated : INTEGER;
 
 BEGIN
-  logger := Log.New(Log.INFO, Log.CONSOLE, "");
+  logger := Log.New(Log.DEBUG, Log.CONSOLE, "");
   Log.Info(logger, "Starting ExampleHttpClient");
 
   DStrings.Init("", body);
