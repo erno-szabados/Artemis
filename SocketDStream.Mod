@@ -298,13 +298,7 @@ BEGIN
     END
   END;
 
-  (* If we exited the loop without finding the delimiter (e.g. socket closed),
-     return what we have accumulated so far. *)
-  IF ~found & (DStrings.Length(stream.inBuf) > 0) THEN
-    DStrings.Copy(stream.inBuf, dstr);
-    DStrings.Init("", stream.inBuf);
-    DStrings.Set(stream.inRider, stream.inBuf, 0)
-  END;
+  (* Do not drain the buffer here. If the loop exited due to WouldBlock or Closed, the partial data remains in stream.inBuf for the next call. *)
 
   RETURN status
 END ReadUntil;
